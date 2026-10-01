@@ -388,6 +388,27 @@ describe('validateTemplate: expression checker hook', () => {
   });
 });
 
+describe('validateTemplate: built-in expression checking', () => {
+  it('checks expression syntax by default', () => {
+    const t = invoiceTemplate() as any;
+    t.body[0].filter = 'row.total >';
+    t.body[0].detail.components[0].text = '{{ row.id + }}';
+    t.body[0].groups[0].expression = 'new Thing()';
+    const paths = validateTemplate(t).errors.map((e) => e.path);
+    expect(paths).toEqual([
+      'body[0].filter',
+      'body[0].groups[0].expression',
+      'body[0].detail.components[0].text',
+    ]);
+  });
+
+  it('can skip expression checks with checkExpression: false', () => {
+    const t = invoiceTemplate() as any;
+    t.body[0].filter = 'row.total >';
+    expect(validateTemplate(t, { checkExpression: false }).errors).toEqual([]);
+  });
+});
+
 describe('validateTemplate: error collection', () => {
   it('collects every error instead of stopping at the first one', () => {
     const errors = errorsAfter((t) => {

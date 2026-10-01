@@ -19,6 +19,8 @@ import {
   VERTICAL_ALIGNS,
   type ReportTemplate,
 } from './types';
+import { checkExpression as defaultCheckExpression } from '../expressions';
+import { splitPlaceholders } from '../expressions/text';
 
 export interface ValidationIssue {
   /** JSON path to the offending value, e.g. `body[0].detail.components[2].x`. */
@@ -46,11 +48,15 @@ export class TemplateValidationError extends Error {
   }
 }
 
-/** Optional hook to validate expression syntax (supplied by the expression module). */
+/** Returns null for a valid expression, otherwise an error message. */
 export type ExpressionChecker = (source: string) => string | null;
 
 export interface ValidateOptions {
-  checkExpression?: ExpressionChecker;
+  /**
+   * Checks expression syntax. Defaults to the built-in JavaScript expression
+   * parser; pass `false` to skip expression checks.
+   */
+  checkExpression?: ExpressionChecker | false;
 }
 
 type Obj = Record<string, unknown>;
@@ -79,7 +85,12 @@ class Validator {
   private dataSourceNames = new Set<string>();
   private styleNames = new Set<string>();
 
-  constructor(private readonly options: ValidateOptions) {}
+  private readonly checker: ExpressionChecker | null;
+
+  constructor(options: ValidateOptions) {
+    this.checker =
+      options.checkExpression === false ? null : (options.checkExpression ?? defaultCheckExpression);
+  }
 
   error(path: string, message: string): void {
     this.errors.push({ path, message });
@@ -178,8 +189,8 @@ class Validator {
 
   expression(o: Obj, key: string, path: string, optional = true): void {
     const v = this.requireNonEmptyString(o, key, path, optional);
-    if (v === undefined || !this.options.checkExpression) return;
-    const problem = this.options.checkExpression(v);
+    if (v === undefined || !this.checker) return;
+    const problem = this.checker(v);
     if (problem) this.error(join(path, key), `invalid expression: ${problem}`);
   }
 
@@ -192,9 +203,9 @@ class Validator {
       this.error(join(path, key), segments);
       return;
     }
-    if (!this.options.checkExpression) return;
+    if (!this.checker) return;
     for (const expr of segments) {
-      const problem = this.options.checkExpression(expr);
+      const problem = this.checker(expr);
       if (problem) this.error(join(path, key), `invalid expression "${expr}": ${problem}`);
     }
   }
@@ -649,25 +660,11 @@ class Validator {
  * `{{` can be written literally as `\{{`.
  */
 export function scanPlaceholders(text: string): string[] | string {
-  const expressions: string[] = [];
-  let i = 0;
-  while (i < text.length) {
-    if (text[i] === '\\' && text.startsWith('{{', i + 1)) {
-      i += 3;
-      continue;
-    }
-    if (text.startsWith('{{', i)) {
-      const end = text.indexOf('}}', i + 2);
-      if (end === -1) return 'unterminated "{{" placeholder';
-      const expr = text.slice(i + 2, end).trim();
-      if (expr === '') return 'empty "{{ }}" placeholder';
-      expressions.push(expr);
-      i = end + 2;
-      continue;
-    }
-    i++;
+  try {
+    return splitPlaceholders(text).flatMap((p) => (p.kind === 'expression' ? [p.source] : []));
+  } catch (err) {
+    return (err as Error).message;
   }
-  return expressions;
 }
 
 function isValidLocale(locale: string): boolean {
