@@ -8,12 +8,12 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/**\" build",
-    "test": "pnpm -r --filter \"./packages/**\" test",
-    "typecheck": "pnpm --filter @ariana-report/core build && pnpm -r typecheck",
-    "check": "pnpm build && pnpm typecheck && pnpm test",
-    "dev:react": "pnpm --filter react-demo dev",
-    "dev:vue": "pnpm --filter vue-demo dev"
+    "build": "corepack pnpm -r --filter \"./packages/**\" build",
+    "test": "corepack pnpm -r --filter \"./packages/**\" test",
+    "typecheck": "corepack pnpm --filter @ariana-report/core build && corepack pnpm -r typecheck",
+    "check": "corepack pnpm build && corepack pnpm typecheck && corepack pnpm test",
+    "dev:react": "corepack pnpm --filter react-demo dev",
+    "dev:vue": "corepack pnpm --filter vue-demo dev"
   },
   "devDependencies": {
     "@types/node": "22.20.4",
