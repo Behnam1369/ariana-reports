@@ -64,7 +64,19 @@ type Obj = Record<string, unknown>;
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const DOT_PATH = /^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$/;
 const COLOR = /^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|transparent|rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?\s*(,\s*[\d.]+%?\s*)?\))$/;
-const RESERVED_NAMES = new Set(['params', 'row', 'page', 'report', 'group', 'parent', 'globals']);
+/** Names the engine binds in every expression scope; data sources may not use them. */
+export const RESERVED_SCOPE_NAMES: ReadonlySet<string> = new Set([
+  'params',
+  'row',
+  'rows',
+  'rowNumber',
+  'page',
+  'report',
+  'group',
+  'groups',
+  'parent',
+]);
+const RESERVED_NAMES = RESERVED_SCOPE_NAMES;
 
 function isObj(v: unknown): v is Obj {
   return typeof v === 'object' && v !== null && !Array.isArray(v);

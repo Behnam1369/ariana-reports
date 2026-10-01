@@ -260,13 +260,16 @@ export interface Band {
   /** Height in template units. */
   height: number;
   components: ReportComponent[];
-  /** Grow to fit components that grow. */
+  /** Grow to fit components that grow. Defaults to true. Ignored for page header/footer. */
   canGrow?: boolean;
-  /** Shrink when components are hidden or empty. */
+  /** Shrink to the bottom of the visible components. Defaults to false. */
   canShrink?: boolean;
   /** JavaScript expression; the band is skipped when it evaluates falsy. */
   visible?: string;
-  /** Move the whole band to the next page instead of splitting it. Defaults to true. */
+  /**
+   * Reserved: bands are never split across pages in v1; a band that does not
+   * fit moves to the next page.
+   */
   keepTogether?: boolean;
   pageBreakBefore?: boolean;
   pageBreakAfter?: boolean;
