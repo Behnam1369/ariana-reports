@@ -1,0 +1,26 @@
+{
+  "name": "ariana-report-monorepo",
+  "private": true,
+  "description": "Frontend-only banded reporting toolkit: JSON templates, JSON data, viewer, designer, PDF and Excel export.",
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" build",
+    "test": "pnpm -r --filter \"./packages/**\" test",
+    "typecheck": "pnpm --filter @ariana-report/core build && pnpm -r typecheck",
+    "check": "pnpm build && pnpm typecheck && pnpm test",
+    "dev:react": "pnpm --filter react-demo dev",
+    "dev:vue": "pnpm --filter vue-demo dev"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "jsdom": "30.1.1",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
+  }
+}
