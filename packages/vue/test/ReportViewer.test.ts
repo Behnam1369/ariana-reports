@@ -137,6 +137,17 @@ describe('ReportViewer (Vue)', () => {
     expect(names).not.toContain('Print');
   });
 
+  it('applies the image source policy', async () => {
+    const t = salesTemplate();
+    t.reportHeader!.components.push({ id: 'logo', type: 'image', x: 0, y: 0, width: 10, height: 10, src: 'https://cdn.example.com/logo.png' });
+    const w = mountViewer({ template: t });
+    await nextTick();
+    expect(w.get('img').attributes('src')).toBe('https://cdn.example.com/logo.png');
+    await w.setProps({ allowImageSrc: () => false });
+    await nextTick();
+    expect(w.find('img').exists()).toBe(false);
+  });
+
   it('can be driven by an external controller', async () => {
     const controller = new ViewerController();
     const w = mountViewer({ controller });

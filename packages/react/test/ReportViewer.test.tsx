@@ -134,6 +134,15 @@ describe('ReportViewer', () => {
     expect(screen.queryByRole('button', { name: 'Print' })).toBeNull();
   });
 
+  it('applies the image source policy', () => {
+    const t = salesTemplate();
+    t.reportHeader!.components.push({ id: 'logo', type: 'image', x: 0, y: 0, width: 10, height: 10, src: 'https://cdn.example.com/logo.png' });
+    const { container, rerender } = render(<ReportViewer template={t} data={salesData} />);
+    expect(container.querySelector('img')!.getAttribute('src')).toBe('https://cdn.example.com/logo.png');
+    rerender(<ReportViewer template={t} data={salesData} allowImageSrc={() => false} />);
+    expect(container.querySelector('img')).toBeNull();
+  });
+
   it('can be driven by an external controller', () => {
     const controller = new ViewerController();
     const { container } = render(<ReportViewer controller={controller} template={salesTemplate()} data={salesData} />);

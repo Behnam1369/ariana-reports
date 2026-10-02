@@ -38,6 +38,8 @@ export interface ReportViewerProps extends Omit<GenerateOptions, 'validate'> {
   controller?: ViewerController;
   /** Add the default stylesheet to the document. Defaults to true. */
   injectStyles?: boolean;
+  /** Decides which image sources the on-screen viewer may load. Defaults to `isSafeImageSrc`. */
+  allowImageSrc?: (src: string) => boolean;
   /** Replaces the browser download for exports. */
   save?: (bytes: Uint8Array, fileName: string, mimeType: string) => void;
   onError?: (error: Error) => void;
@@ -47,13 +49,23 @@ export interface ReportViewerProps extends Omit<GenerateOptions, 'validate'> {
 }
 
 /** Renders one page of a layout document with the shared DOM renderer. */
-export function ReportPage({ document: doc, pageIndex, zoom }: { document: LayoutDocument; pageIndex: number; zoom: number }) {
+export function ReportPage({
+  document: doc,
+  pageIndex,
+  zoom,
+  allowImageSrc,
+}: {
+  document: LayoutDocument;
+  pageIndex: number;
+  zoom: number;
+  allowImageSrc?: (src: string) => boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const host = ref.current;
     if (!host || !doc.pages[pageIndex]) return;
-    host.replaceChildren(renderPage(doc, pageIndex, { scale: zoom, ownerDocument: host.ownerDocument }));
-  }, [doc, pageIndex, zoom]);
+    host.replaceChildren(renderPage(doc, pageIndex, { scale: zoom, ownerDocument: host.ownerDocument, ...(allowImageSrc ? { allowImageSrc } : {}) }));
+  }, [doc, pageIndex, zoom, allowImageSrc]);
   return <div ref={ref} className="ar-page-host" />;
 }
 
@@ -96,6 +108,7 @@ export function ReportViewer(props: ReportViewerProps) {
     controller: external,
     injectStyles: inject = true,
     save,
+    allowImageSrc,
     onError,
     onGenerated,
     className,
@@ -276,7 +289,7 @@ export function ReportViewer(props: ReportViewerProps) {
               {state.error.message}
             </div>
           ) : doc ? (
-            <ReportPage document={doc} pageIndex={state.pageIndex} zoom={state.zoom} />
+            <ReportPage document={doc} pageIndex={state.pageIndex} zoom={state.zoom} allowImageSrc={allowImageSrc} />
           ) : (
             <div className="ar-status">{labels.noReport}</div>
           )}

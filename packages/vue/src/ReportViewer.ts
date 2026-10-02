@@ -36,6 +36,7 @@ export const ReportPage = defineComponent({
     document: { type: Object as PropType<LayoutDocument>, required: true },
     pageIndex: { type: Number, required: true },
     zoom: { type: Number, default: 1 },
+    allowImageSrc: { type: Function as PropType<(src: string) => boolean> },
   },
   setup(props) {
     const host = ref<HTMLDivElement>();
@@ -43,7 +44,8 @@ export const ReportPage = defineComponent({
       watchEffect(() => {
         const el = host.value;
         if (!el || !props.document.pages[props.pageIndex]) return;
-        el.replaceChildren(renderPage(props.document, props.pageIndex, { scale: props.zoom, ownerDocument: el.ownerDocument }));
+        const allow = props.allowImageSrc;
+        el.replaceChildren(renderPage(props.document, props.pageIndex, { scale: props.zoom, ownerDocument: el.ownerDocument, ...(allow ? { allowImageSrc: allow } : {}) }));
       });
     });
     return () => h('div', { ref: host, class: 'ar-page-host' });
@@ -98,6 +100,8 @@ export const ReportViewer = defineComponent({
     controller: { type: Object as PropType<ViewerController> },
     injectStyles: { type: Boolean, default: true },
     save: { type: Function as PropType<(bytes: Uint8Array, fileName: string, mimeType: string) => void> },
+    /** Decides which image sources the on-screen viewer may load. Defaults to `isSafeImageSrc`. */
+    allowImageSrc: { type: Function as PropType<(src: string) => boolean> },
   },
   emits: {
     generated: (_doc: LayoutDocument) => true,
@@ -271,7 +275,7 @@ export const ReportViewer = defineComponent({
       const content = s.error
         ? h('div', { class: 'ar-status ar-status-error', role: 'alert' }, [h('strong', l.reportError), '\n', s.error.message])
         : doc
-          ? h(ReportPage, { document: doc, pageIndex: s.pageIndex, zoom: s.zoom })
+          ? h(ReportPage, { document: doc, pageIndex: s.pageIndex, zoom: s.zoom, allowImageSrc: props.allowImageSrc })
           : h('div', { class: 'ar-status' }, l.noReport);
 
       return h('div', { class: 'ar-root ar-viewer' }, [
