@@ -462,6 +462,7 @@ class ReportGenerator {
       height = Math.max(height, lines.length * lineHeight + style.padding.top + style.padding.bottom);
     }
     const item: LayoutItem = { ...base, height, kind: 'text', text, lines, lineHeight, value };
+    if (c.format) item.format = c.format;
     if (error) item.error = true;
     return item;
   }
@@ -518,7 +519,7 @@ class ReportGenerator {
     let page!: PageState;
     let pageScope!: object;
 
-    const placeBand = (inst: Instance, m: Measured) => {
+    const placeBand = (inst: Instance, m: Measured, repeated = false) => {
       const band: LayoutBand = {
         bandId: inst.band.id,
         role: inst.role,
@@ -529,6 +530,7 @@ class ReportGenerator {
         items: m.items.map((it) => offsetItem(it, this.margins.left, page.cursor)),
       };
       if (inst.regionId !== undefined) band.regionId = inst.regionId;
+      if (repeated) band.repeated = true;
       if (m.backgroundColor) band.backgroundColor = m.backgroundColor;
       if (m.border) band.border = m.border;
       page.bands.push(band);
@@ -558,7 +560,7 @@ class ReportGenerator {
       if (!(number === 1 && hasReportHeader)) reservePageHeader();
       for (const header of repeatHeaders) {
         const m = this.measureBand(header, pageScope);
-        if (m) placeBand(header, m);
+        if (m) placeBand(header, m, true);
       }
     };
 

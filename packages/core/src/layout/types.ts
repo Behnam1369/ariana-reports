@@ -6,6 +6,7 @@ import type {
   ImageFit,
   TextAlign,
   TextDecoration,
+  ValueFormat,
   VerticalAlign,
 } from '../model/types';
 import type { BandRole } from '../model/walk';
@@ -39,6 +40,8 @@ export interface LayoutBand {
   role: BandRole;
   /** Data region the band belongs to, if any. */
   regionId?: string;
+  /** True for region headers repeated at the top of a continuation page. */
+  repeated?: boolean;
   /** Position and size on the page, in points. */
   x: number;
   y: number;
@@ -102,6 +105,8 @@ export interface LayoutText extends LayoutItemBase {
    * as Excel can keep numbers and dates typed. Otherwise equal to `text`.
    */
   value: unknown;
+  /** The component's value format, used by exporters for typed cells. */
+  format?: ValueFormat;
   /** True when an expression failed and the text shows an error marker. */
   error?: boolean;
 }

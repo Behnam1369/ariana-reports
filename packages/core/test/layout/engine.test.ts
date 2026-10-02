@@ -390,6 +390,8 @@ describe('pagination', () => {
     // Page 1: PH, Columns, 1..5 (10 + 10 + 250 = 270 of 280)
     expect(pageTexts(doc, 0)).toEqual(['PH', 'Columns', '1', '2', '3', '4', '5']);
     expect(pageTexts(doc, 1)).toEqual(['PH', 'Columns', '6', '7', '8', 'Footer']);
+    expect(bandsOf(doc, 0)[1]!.repeated).toBeUndefined();
+    expect(bandsOf(doc, 1)[1]).toMatchObject({ role: 'regionHeader', repeated: true });
     // The static band after the region does not repeat the header.
     expect(pageTexts(doc, 2)).toEqual(['PH', 'after']);
   });
@@ -550,6 +552,8 @@ describe('bands and components', () => {
     expect(items[0]!.value).toBe(1234.5);
     expect(items[1]!.value).toBe('Total: 1,234.5');
     expect(items[2]!.value).toBe('2026-03-05');
+    expect(items[0]!.format).toEqual({ type: 'currency', currency: 'USD' });
+    expect(items[2]!.format).toEqual({ type: 'date', pattern: 'dd/MM/yyyy' });
   });
 
   it('uses the locale option for formatting', () => {
