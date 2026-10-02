@@ -10,6 +10,7 @@ import {
   toDisplayString,
   toNumber,
 } from '../format/format';
+import { currencyToWords, numberToWords } from '../format/words';
 import { describeValue, isTrusted, markTrusted, readProperty, runtimeError } from './safety';
 
 type Fn = (...args: unknown[]) => unknown;
@@ -300,6 +301,15 @@ export function getBuiltins(locale: string = DEFAULT_LOCALE): Readonly<Record<st
     formatDate: (v: unknown, pattern: unknown = 'yyyy-MM-dd') => {
       const d = toDate(v);
       return d ? formatDate(d, String(pattern), locale) : toDisplayString(v);
+    },
+    toWords: (v: unknown) => {
+      const n = toNumber(v);
+      return n === null ? '' : numberToWords(n);
+    },
+    toCurrencyWords: (v: unknown, currencyName: unknown = '', centsName: unknown = 'Cents') => {
+      const n = toNumber(v);
+      if (n === null) return '';
+      return currencyToWords(n, toDisplayString(currencyName), toDisplayString(centsName));
     },
   });
 

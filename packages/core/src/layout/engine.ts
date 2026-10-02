@@ -483,6 +483,19 @@ class ReportGenerator {
       if (band.canGrow !== false) height = Math.max(height, contentBottom);
       if (band.canShrink) height = Math.min(height, contentBottom);
     }
+    // Components that fill the band vertically follow its final height.
+    const growIds = new Set(band.components.filter((c) => c.growToHeight).map((c) => c.id));
+    if (growIds.size > 0) {
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i]!;
+        if (!growIds.has(it.componentId)) continue;
+        const target = height - it.y;
+        if (target <= it.height) continue;
+        const grown = { ...it, height: target };
+        if (grown.kind === 'line' && grown.x1 === grown.x2) grown.y2 = grown.y1 + target;
+        items[i] = grown;
+      }
+    }
     const style = band.style ? resolveStyle(band.style, this.unit) : undefined;
     const measured: Measured = { height, items };
     if (style?.backgroundColor) measured.backgroundColor = style.backgroundColor;
@@ -504,6 +517,34 @@ class ReportGenerator {
     const pageFooterHeight = t.pageFooter ? toPoints(t.pageFooter.height, this.unit) : 0;
     const hasReportHeader = instances[0]?.role === 'reportHeader';
 
+    // Detail rows placed so far, per data region, with the page they landed on.
+    const placed = new Map<string, { row: unknown; page: number }[]>();
+    const collectRegions = (region: DataRegion) => {
+      placed.set(region.id, []);
+      for (const child of region.children ?? []) collectRegions(child);
+    };
+    for (const item of t.body) if (item.kind === 'dataRegion') collectRegions(item);
+    const rowsWhere = (id: string, test: (page: number) => boolean) =>
+      (placed.get(id) ?? []).filter((p) => test(p.page)).map((p) => p.row);
+    /**
+     * `page.regions[id]` exposes the rows of a data region relative to a page:
+     * `rows` (on this page), `before` (on earlier pages) and `through` (up to
+     * and including this page). Used for brought/carried-forward totals.
+     */
+    const regionsFor = (number: number) => {
+      const regions: Record<string, unknown> = {};
+      for (const id of placed.keys()) {
+        const entry = {};
+        Object.defineProperties(entry, {
+          rows: { enumerable: true, get: () => rowsWhere(id, (p) => p === number) },
+          before: { enumerable: true, get: () => rowsWhere(id, (p) => p < number) },
+          through: { enumerable: true, get: () => rowsWhere(id, (p) => p <= number) },
+        });
+        regions[id] = Object.freeze(entry);
+      }
+      return Object.freeze(regions);
+    };
+
     const pageObject = (number: number) => {
       const page = { number };
       Object.defineProperty(page, 'count', {
@@ -513,6 +554,7 @@ class ReportGenerator {
           return pageCount;
         },
       });
+      Object.defineProperty(page, 'regions', { enumerable: true, get: () => regionsFor(number) });
       return page;
     };
 
@@ -530,6 +572,9 @@ class ReportGenerator {
         items: m.items.map((it) => offsetItem(it, this.margins.left, page.cursor)),
       };
       if (inst.regionId !== undefined) band.regionId = inst.regionId;
+      if (inst.role === 'detail' && inst.regionId !== undefined && !repeated) {
+        placed.get(inst.regionId)?.push({ row: inst.scope.row, page: page.number });
+      }
       if (repeated) band.repeated = true;
       if (m.backgroundColor) band.backgroundColor = m.backgroundColor;
       if (m.border) band.border = m.border;
@@ -618,7 +663,7 @@ class ReportGenerator {
     const total = pages.length;
     for (const p of pages) {
       const isLast = p.number === total;
-      const scope = { number: p.number, count: total };
+      const scope = { number: p.number, count: total, regions: regionsFor(p.number) };
       const extra: LayoutBand[] = [];
       for (const [band, role, slot] of [
         [t.pageHeader, 'pageHeader', p.headerSlot],

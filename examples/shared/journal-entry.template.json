@@ -1,0 +1,453 @@
+{
+  "schemaVersion": 1,
+  "name": "Journal entry",
+  "description": "A journal voucher with cost centers, brought/carried-forward totals per page and the total in words.",
+  "unit": "mm",
+  "locale": "en-US",
+  "page": {
+    "size": "A4",
+    "orientation": "landscape",
+    "margins": { "top": 10, "right": 10, "bottom": 10, "left": 10 }
+  },
+  "dataSources": [
+    {
+      "name": "entry",
+      "path": "root",
+      "fields": [
+        { "name": "no", "type": "number" },
+        { "name": "ref", "type": "string" },
+        { "name": "date", "type": "date" },
+        { "name": "description", "type": "string" },
+        { "name": "organization_name", "type": "string" }
+      ]
+    },
+    {
+      "name": "items",
+      "path": "root.items",
+      "fields": [
+        { "name": "row", "type": "number" },
+        { "name": "account_code", "type": "string" },
+        { "name": "account_name", "type": "string" },
+        { "name": "center_1_code", "type": "string" },
+        { "name": "center_1_name", "type": "string" },
+        { "name": "center_2_code", "type": "string" },
+        { "name": "center_2_name", "type": "string" },
+        { "name": "center_3_code", "type": "string" },
+        { "name": "center_3_name", "type": "string" },
+        { "name": "center_4_code", "type": "string" },
+        { "name": "center_4_name", "type": "string" },
+        { "name": "center_5_code", "type": "string" },
+        { "name": "center_5_name", "type": "string" },
+        { "name": "center_6_code", "type": "string" },
+        { "name": "center_6_name", "type": "string" },
+        { "name": "description", "type": "string" },
+        { "name": "debit", "type": "number" },
+        { "name": "credit", "type": "number" },
+        { "name": "abr", "type": "string" },
+        { "name": "currency_amount", "type": "number" },
+        { "name": "rate", "type": "number" }
+      ]
+    }
+  ],
+  "parameters": [
+    { "name": "currencyName", "type": "string", "label": "Currency name (in words)", "defaultValue": "Dollars" },
+    { "name": "centsName", "type": "string", "label": "Cents name (in words)", "defaultValue": "Cents" }
+  ],
+  "styles": {
+    "th": {
+      "fontSize": 8,
+      "fontWeight": "bold",
+      "backgroundColor": "#d9d9d9",
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "padding": 1,
+      "border": { "width": 0.5, "color": "#000000", "style": "solid" }
+    },
+    "cell": {
+      "fontSize": 8,
+      "verticalAlign": "middle",
+      "padding": 1,
+      "border": { "width": 0.5, "color": "#000000", "style": "solid" }
+    },
+    "sum": {
+      "fontSize": 8,
+      "fontWeight": "bold",
+      "backgroundColor": "#f2f2f2",
+      "textAlign": "right",
+      "verticalAlign": "middle",
+      "padding": 1,
+      "border": { "width": 0.5, "color": "#000000", "style": "solid" }
+    },
+    "label": { "fontSize": 9, "fontWeight": "bold", "verticalAlign": "middle" },
+    "value": { "fontSize": 9, "verticalAlign": "middle" },
+    "muted": { "fontSize": 8, "color": "#555555", "verticalAlign": "middle" }
+  },
+  "pageHeader": {
+    "id": "voucher_header",
+    "height": 36,
+    "components": [
+      {
+        "id": "org_name",
+        "type": "text",
+        "x": 0,
+        "y": 0,
+        "width": 277,
+        "height": 9,
+        "style": { "fontSize": 18, "fontWeight": "bold", "textAlign": "center", "verticalAlign": "middle" },
+        "text": "{{ entry[0].organization_name }}"
+      },
+      {
+        "id": "voucher_title",
+        "type": "text",
+        "x": 0,
+        "y": 9,
+        "width": 277,
+        "height": 7,
+        "style": { "fontSize": 14, "fontWeight": "bold", "color": "#666666", "textAlign": "center", "verticalAlign": "middle" },
+        "text": "Journal Entry"
+      },
+      {
+        "id": "voucher_description",
+        "type": "text",
+        "x": 0,
+        "y": 19,
+        "width": 195,
+        "height": 15,
+        "style": {
+          "fontSize": 9,
+          "padding": 1.5,
+          "border": { "width": 0.5, "color": "#000000", "style": "solid" }
+        },
+        "text": "Description: {{ entry[0].description }}"
+      },
+      { "id": "no_label", "type": "text", "x": 205, "y": 19, "width": 18, "height": 5, "styleName": "label", "text": "No.:" },
+      { "id": "no_value", "type": "text", "x": 223, "y": 19, "width": 54, "height": 5, "styleName": "value", "text": "{{ entry[0].no }}" },
+      { "id": "ref_label", "type": "text", "x": 205, "y": 24, "width": 18, "height": 5, "styleName": "label", "text": "Ref.:" },
+      { "id": "ref_value", "type": "text", "x": 223, "y": 24, "width": 54, "height": 5, "styleName": "value", "text": "{{ entry[0].ref }}" },
+      { "id": "date_label", "type": "text", "x": 205, "y": 29, "width": 18, "height": 5, "styleName": "label", "text": "Date:" },
+      {
+        "id": "date_value",
+        "type": "text",
+        "x": 223,
+        "y": 29,
+        "width": 54,
+        "height": 5,
+        "styleName": "value",
+        "format": { "type": "date", "pattern": "yyyy-MM-dd" },
+        "text": "{{ entry[0].date }}"
+      }
+    ]
+  },
+  "pageFooter": {
+    "id": "voucher_footer",
+    "height": 13,
+    "components": [
+      {
+        "id": "cf_label",
+        "type": "text",
+        "x": 0,
+        "y": 0,
+        "width": 159,
+        "height": 6,
+        "styleName": "sum",
+        "visible": "page.number < page.count",
+        "text": "Carried forward"
+      },
+      {
+        "id": "cf_debit",
+        "type": "text",
+        "x": 159,
+        "y": 0,
+        "width": 26,
+        "height": 6,
+        "styleName": "sum",
+        "visible": "page.number < page.count",
+        "format": { "type": "number", "decimals": 2 },
+        "text": "{{ sum(page.regions.lines.through, 'debit') }}"
+      },
+      {
+        "id": "cf_credit",
+        "type": "text",
+        "x": 185,
+        "y": 0,
+        "width": 26,
+        "height": 6,
+        "styleName": "sum",
+        "visible": "page.number < page.count",
+        "format": { "type": "number", "decimals": 2 },
+        "text": "{{ sum(page.regions.lines.through, 'credit') }}"
+      },
+      {
+        "id": "cf_rest",
+        "type": "text",
+        "x": 211,
+        "y": 0,
+        "width": 66,
+        "height": 6,
+        "styleName": "sum",
+        "visible": "page.number < page.count",
+        "text": ""
+      },
+      {
+        "id": "printed_at",
+        "type": "text",
+        "x": 0,
+        "y": 8,
+        "width": 120,
+        "height": 5,
+        "styleName": "muted",
+        "text": "Printed at {{ formatDate(now(), 'yyyy-MM-dd HH:mm') }}"
+      },
+      {
+        "id": "page_of",
+        "type": "text",
+        "x": 157,
+        "y": 8,
+        "width": 120,
+        "height": 5,
+        "styleName": "muted",
+        "style": { "textAlign": "right" },
+        "text": "Page {{ page.number }} of {{ page.count }}"
+      }
+    ]
+  },
+  "body": [
+    {
+      "kind": "dataRegion",
+      "id": "lines",
+      "dataSource": "items",
+      "sort": [{ "expression": "row.row", "direction": "asc" }],
+      "repeatHeaderOnEachPage": true,
+      "header": {
+        "id": "columns",
+        "height": 13,
+        "canShrink": true,
+        "components": [
+          { "id": "th_row", "type": "text", "x": 0, "y": 0, "width": 12, "height": 7, "styleName": "th", "text": "Row" },
+          { "id": "th_account", "type": "text", "x": 12, "y": 0, "width": 85, "height": 7, "styleName": "th", "text": "Account" },
+          { "id": "th_description", "type": "text", "x": 97, "y": 0, "width": 62, "height": 7, "styleName": "th", "text": "Description" },
+          { "id": "th_debit", "type": "text", "x": 159, "y": 0, "width": 26, "height": 7, "styleName": "th", "text": "Debit" },
+          { "id": "th_credit", "type": "text", "x": 185, "y": 0, "width": 26, "height": 7, "styleName": "th", "text": "Credit" },
+          { "id": "th_currency", "type": "text", "x": 211, "y": 0, "width": 14, "height": 7, "styleName": "th", "text": "Cur." },
+          { "id": "th_amount", "type": "text", "x": 225, "y": 0, "width": 28, "height": 7, "styleName": "th", "text": "Amount" },
+          { "id": "th_rate", "type": "text", "x": 253, "y": 0, "width": 24, "height": 7, "styleName": "th", "text": "Rate" },
+          {
+            "id": "bf_label",
+            "type": "text",
+            "x": 0,
+            "y": 7,
+            "width": 159,
+            "height": 6,
+            "styleName": "sum",
+            "visible": "page.number > 1",
+            "text": "Brought forward"
+          },
+          {
+            "id": "bf_debit",
+            "type": "text",
+            "x": 159,
+            "y": 7,
+            "width": 26,
+            "height": 6,
+            "styleName": "sum",
+            "visible": "page.number > 1",
+            "format": { "type": "number", "decimals": 2 },
+            "text": "{{ sum(page.regions.lines.before, 'debit') }}"
+          },
+          {
+            "id": "bf_credit",
+            "type": "text",
+            "x": 185,
+            "y": 7,
+            "width": 26,
+            "height": 6,
+            "styleName": "sum",
+            "visible": "page.number > 1",
+            "format": { "type": "number", "decimals": 2 },
+            "text": "{{ sum(page.regions.lines.before, 'credit') }}"
+          },
+          {
+            "id": "bf_rest",
+            "type": "text",
+            "x": 211,
+            "y": 7,
+            "width": 66,
+            "height": 6,
+            "styleName": "sum",
+            "visible": "page.number > 1",
+            "text": ""
+          }
+        ]
+      },
+      "detail": {
+        "id": "line",
+        "height": 6,
+        "components": [
+          {
+            "id": "line_row",
+            "type": "text",
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 6,
+            "styleName": "cell",
+            "style": { "textAlign": "center" },
+            "growToHeight": true,
+            "text": "{{ row.row }}"
+          },
+          {
+            "id": "line_account_box",
+            "type": "rectangle",
+            "x": 12,
+            "y": 0,
+            "width": 85,
+            "height": 6,
+            "style": { "border": { "width": 0.5, "color": "#000000", "style": "solid" } },
+            "growToHeight": true
+          },
+          {
+            "id": "line_account",
+            "type": "text",
+            "x": 12,
+            "y": 0,
+            "width": 85,
+            "height": 6,
+            "style": { "fontSize": 8, "fontWeight": "bold", "verticalAlign": "middle", "padding": 1 },
+            "conditions": [{ "expression": "row.center_1_code", "style": { "verticalAlign": "top" } }],
+            "wordWrap": false,
+            "text": "{{ row.account_code }} - {{ row.account_name }}"
+          },
+          {
+            "id": "line_centers",
+            "type": "text",
+            "x": 12,
+            "y": 4.5,
+            "width": 85,
+            "height": 4,
+            "style": { "fontSize": 7, "color": "#444444", "padding": { "top": 0, "right": 1, "bottom": 1, "left": 1 } },
+            "visible": "row.center_1_code",
+            "canGrow": true,
+            "text": "{{ [1, 2, 3, 4, 5, 6].filter(i => row['center_' + i + '_code']).map(i => row['center_' + i + '_code'] + ' ' + row['center_' + i + '_name']).join('  |  ') }}"
+          },
+          {
+            "id": "line_description",
+            "type": "text",
+            "x": 97,
+            "y": 0,
+            "width": 62,
+            "height": 6,
+            "styleName": "cell",
+            "canGrow": true,
+            "growToHeight": true,
+            "text": "{{ row.description }}"
+          },
+          {
+            "id": "line_debit",
+            "type": "text",
+            "x": 159,
+            "y": 0,
+            "width": 26,
+            "height": 6,
+            "styleName": "cell",
+            "style": { "textAlign": "right" },
+            "growToHeight": true,
+            "format": { "type": "number", "decimals": 2 },
+            "text": "{{ row.debit ? row.debit : '' }}"
+          },
+          {
+            "id": "line_credit",
+            "type": "text",
+            "x": 185,
+            "y": 0,
+            "width": 26,
+            "height": 6,
+            "styleName": "cell",
+            "style": { "textAlign": "right" },
+            "growToHeight": true,
+            "format": { "type": "number", "decimals": 2 },
+            "text": "{{ row.credit ? row.credit : '' }}"
+          },
+          {
+            "id": "line_currency",
+            "type": "text",
+            "x": 211,
+            "y": 0,
+            "width": 14,
+            "height": 6,
+            "styleName": "cell",
+            "style": { "textAlign": "center" },
+            "growToHeight": true,
+            "text": "{{ row.abr }}"
+          },
+          {
+            "id": "line_amount",
+            "type": "text",
+            "x": 225,
+            "y": 0,
+            "width": 28,
+            "height": 6,
+            "styleName": "cell",
+            "style": { "textAlign": "right" },
+            "growToHeight": true,
+            "format": { "type": "number", "decimals": 2 },
+            "text": "{{ row.currency_amount ? row.currency_amount : '' }}"
+          },
+          {
+            "id": "line_rate",
+            "type": "text",
+            "x": 253,
+            "y": 0,
+            "width": 24,
+            "height": 6,
+            "styleName": "cell",
+            "style": { "textAlign": "right" },
+            "growToHeight": true,
+            "format": { "type": "number", "decimals": 2 },
+            "text": "{{ row.rate ? row.rate : '' }}"
+          }
+        ]
+      },
+      "footer": {
+        "id": "totals",
+        "height": 14,
+        "components": [
+          { "id": "total_label", "type": "text", "x": 0, "y": 0, "width": 159, "height": 6, "styleName": "sum", "text": "TOTAL" },
+          {
+            "id": "total_debit",
+            "type": "text",
+            "x": 159,
+            "y": 0,
+            "width": 26,
+            "height": 6,
+            "styleName": "sum",
+            "format": { "type": "number", "decimals": 2 },
+            "text": "{{ sum(rows, 'debit') }}"
+          },
+          {
+            "id": "total_credit",
+            "type": "text",
+            "x": 185,
+            "y": 0,
+            "width": 26,
+            "height": 6,
+            "styleName": "sum",
+            "format": { "type": "number", "decimals": 2 },
+            "text": "{{ sum(rows, 'credit') }}"
+          },
+          { "id": "total_rest", "type": "text", "x": 211, "y": 0, "width": 66, "height": 6, "styleName": "sum", "text": "" },
+          {
+            "id": "total_words",
+            "type": "text",
+            "x": 0,
+            "y": 8,
+            "width": 277,
+            "height": 6,
+            "style": { "fontSize": 9, "verticalAlign": "middle", "padding": 1 },
+            "canGrow": true,
+            "text": "In words: {{ toCurrencyWords(sum(rows, 'debit'), params.currencyName, params.centsName) }}"
+          }
+        ]
+      }
+    }
+  ]
+}

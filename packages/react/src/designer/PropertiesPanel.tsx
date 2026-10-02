@@ -191,6 +191,7 @@ function ComponentProperties({ component, bandId }: { component: ReportComponent
             </label>
           ))}
         </div>
+        <CheckInput label="Stretch to band height" checked={!!component.growToHeight} onChange={(on) => update({ growToHeight: on || undefined })} />
       </Section>
       {component.type === 'text' && (
         <Section title="Content">

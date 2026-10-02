@@ -276,6 +276,10 @@ describe('ReportDesigner: properties', () => {
     await user.clear(x);
     await user.type(x, '150{Enter}');
     expect(comp('tot')!.x).toBe(150);
+    await user.click(screen.getByLabelText('Stretch to band height'));
+    expect(comp('tot')!.growToHeight).toBe(true);
+    await user.click(screen.getByLabelText('Stretch to band height'));
+    expect(comp('tot')!.growToHeight).toBeUndefined();
     const text = screen.getByLabelText('Text') as HTMLTextAreaElement;
     await user.clear(text);
     await user.type(text, 'Total: {{{{ row.total ');

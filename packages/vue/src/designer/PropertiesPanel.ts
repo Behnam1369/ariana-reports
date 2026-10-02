@@ -193,6 +193,7 @@ const ComponentProperties = defineComponent({
               h('label', { key: k, class: 'ar-hint' }, [`${k} (${unit})`, h(NumberInput, { min: 0, value: c[k], ariaLabel: `${k} (${unit})`, onCommit: (v?: number) => update({ [k]: v ?? 0 }) })]),
             ),
           ),
+          check('Stretch to band height', !!c.growToHeight, (on) => update({ growToHeight: on || undefined })),
         ]),
       ];
       if (c.type === 'text') {

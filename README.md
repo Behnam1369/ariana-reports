@@ -153,7 +153,7 @@ Band options: `height`, `canGrow` (default true), `canShrink`, `visible` (expres
 
 ### Components
 
-All components have `id`, `x`, `y`, `width`, `height`, optional `name`, `styleName`, `style`, `conditions` and `visible`.
+All components have `id`, `x`, `y`, `width`, `height`, optional `name`, `styleName`, `style`, `conditions`, `visible` and `growToHeight`. With `growToHeight: true` a component stretches to the bottom of its band once the band height is known, so bordered table cells stay aligned when one cell grows.
 
 | Type | Properties |
 | --- | --- |
@@ -196,17 +196,26 @@ Not supported: assignment, statements, `new`, `this`, `function`, `class`, loops
 | `groups` | all active groups, outermost first |
 | `parent` | the parent row inside a child region |
 | `params` | parameter values |
-| `page` | `{ number, count }` |
+| `page` | `{ number, count, regions }`; `page.regions.<regionId>` has `rows` (detail rows on this page), `before` (on earlier pages) and `through` (up to and including this page) |
 | `report` | `{ name, description }` |
 | `<dataSource>` | every data source by name, e.g. `orders` |
 
-**Functions**: `sum avg min max count first last distinct` (each takes an array plus an optional field name or `r => …` selector), `round floor ceil abs`, `upper lower trim len left right`, `string number isNull isEmpty coalesce iif`, `now today date year month day addDays addMonths dateDiff`, `format formatNumber formatCurrency formatPercent formatDate`, and a safe `Math`. Strings, numbers, arrays and dates expose the usual read-only methods (`map`, `filter`, `reduce`, `join`, `toUpperCase`, `padStart`, `toFixed`, `getFullYear`, …); `sort` and `reverse` return copies.
+**Functions**: `sum avg min max count first last distinct` (each takes an array plus an optional field name or `r => …` selector), `round floor ceil abs`, `upper lower trim len left right`, `string number isNull isEmpty coalesce iif`, `now today date year month day addDays addMonths dateDiff`, `format formatNumber formatCurrency formatPercent formatDate`, `toWords(n)` and `toCurrencyWords(amount, currencyName, centsName)` (English, e.g. "Twelve Dollars And Fifty Cents"), and a safe `Math`. Strings, numbers, arrays and dates expose the usual read-only methods (`map`, `filter`, `reduce`, `join`, `toUpperCase`, `padStart`, `toFixed`, `getFullYear`, …); `sort` and `reverse` return copies.
 
 **Safety**: expressions can only read own properties of your data. `window`, globals, prototypes and `constructor` are unreachable, functions found in the data cannot be called, and every evaluation has limits on steps, call depth, string length and array size. Your own functions can be added with the `functions` option:
 
 ```ts
 generateReport(template, data, { functions: { vat: (n: number) => n * 0.09 } }); // {{ vat(row.total) }}
 ```
+
+**Running totals per page**: `page.regions` makes brought-forward and carried-forward lines possible. Put the brought-forward line in a region header with `repeatHeaderOnEachPage` and `canShrink`, and the carried-forward line in the page footer:
+
+```text
+region header:  {{ sum(page.regions.lines.before, 'debit') }}   visible: page.number > 1
+page footer:    {{ sum(page.regions.lines.through, 'debit') }}  visible: page.number < page.count
+```
+
+In body bands, `rows` and `through` only include rows placed so far on the current page; page headers and footers see the complete page. [`examples/shared/journal-entry.template.json`](examples/shared/journal-entry.template.json) is a full example.
 
 An expression that fails at runtime shows `#ERROR` in its text box and is listed in `document.issues` (and in the viewer's Issues panel); the rest of the report still renders.
 
@@ -266,7 +275,7 @@ corepack pnpm dev:react    # React demo (examples/react-demo)
 corepack pnpm dev:vue      # Vue demo (examples/vue-demo)
 ```
 
-The demos use the package sources directly, so they run without a build.
+The demos use the package sources directly, so they run without a build. Both offer two sample reports: "Sales by customer" and a multi-page "Journal entry".
 
 ### Publishing
 

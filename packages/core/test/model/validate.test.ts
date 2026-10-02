@@ -345,6 +345,16 @@ describe('validateTemplate: components', () => {
     );
   });
 
+  it('accepts growToHeight on any component and requires a boolean', () => {
+    expect(
+      errorsAfter((t) => {
+        t.body[0].detail.components[0].growToHeight = true;
+        t.pageHeader.components[0].growToHeight = false;
+      }),
+    ).toEqual([]);
+    expectError((t) => (t.body[0].detail.components[0].growToHeight = 'yes'), `${detail}[0].growToHeight`, /boolean/);
+  });
+
   it('validates image, line and rectangle specifics', () => {
     expectError((t) => (t.reportFooter.components[0].fit = 'stretch'), 'reportFooter.components[0].fit');
     expectError((t) => (t.pageHeader.components[0].orientation = 'diagonal'), 'pageHeader.components[0].orientation');

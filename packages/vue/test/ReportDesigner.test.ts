@@ -290,6 +290,10 @@ describe('ReportDesigner (Vue): properties', () => {
     await x.setValue('150');
     await x.trigger('keydown', { key: 'Enter' });
     expect(comp('tot')!.x).toBe(150);
+    await byLabel(w, 'Stretch to band height').setValue(true);
+    expect(comp('tot')!.growToHeight).toBe(true);
+    await byLabel(w, 'Stretch to band height').setValue(false);
+    expect(comp('tot')!.growToHeight).toBeUndefined();
     const text = byLabel(w, 'Text');
     await text.setValue('Total: {{ row.total');
     expect(w.get('[role="alert"]').text()).toMatch(/unterminated/);

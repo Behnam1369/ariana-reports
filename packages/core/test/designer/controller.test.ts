@@ -536,6 +536,9 @@ describe('data, parameters and styles', () => {
     expect(c.completions('orders_header')).not.toContain('row');
     expect(c.completions('item_detail')).toEqual(expect.arrayContaining(['parent', 'row.sku', 'row.qty']));
     expect(c.completions()).not.toContain('rows');
+    expect(c.completions()).toEqual(
+      expect.arrayContaining(['page.regions.orders_region.before', 'page.regions.items_region.through']),
+    );
     expect(c.checkExpression('row.total >')).toMatch(/Unexpected end/);
     expect(c.checkExpression('row.total > 1')).toBeNull();
   });

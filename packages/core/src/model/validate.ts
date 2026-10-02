@@ -576,7 +576,7 @@ class Validator {
   component(c: unknown, path: string): void {
     if (!this.requireObject(c, path)) return;
     const type = this.requireEnum(c, 'type', COMPONENT_TYPES, path);
-    const base = ['id', 'type', 'name', 'x', 'y', 'width', 'height', 'styleName', 'style', 'conditions', 'visible'];
+    const base = ['id', 'type', 'name', 'x', 'y', 'width', 'height', 'styleName', 'style', 'conditions', 'visible', 'growToHeight'];
     const extra: Record<string, string[]> = {
       text: ['text', 'format', 'canGrow', 'wordWrap'],
       image: ['src', 'fit'],
@@ -600,6 +600,7 @@ class Validator {
     }
     if (c.style !== undefined) this.style(c.style, join(path, 'style'));
     this.expression(c, 'visible', path);
+    this.optionalBoolean(c, 'growToHeight', path);
 
     const conditions = this.requireArray(c, 'conditions', path, true);
     conditions?.forEach((cond, i) => {

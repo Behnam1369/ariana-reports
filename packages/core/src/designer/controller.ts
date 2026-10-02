@@ -984,6 +984,10 @@ export class DesignerController {
     const names = new Set<string>(['params', 'report', 'page.number', 'page.count']);
     for (const ds of t.dataSources) names.add(ds.name);
     for (const p of t.parameters ?? []) names.add(`params.${p.name}`);
+    for (const v of walkBands(t)) {
+      if (v.role !== 'detail' || !v.region) continue;
+      for (const part of ['rows', 'before', 'through']) names.add(`page.regions.${v.region.id}.${part}`);
+    }
     const visit = bandId ? findBand(t, bandId) : undefined;
     if (visit?.region) {
       names.add('rows');

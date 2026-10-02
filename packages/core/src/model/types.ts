@@ -210,6 +210,11 @@ export interface ComponentBase {
   conditions?: ConditionalStyle[];
   /** JavaScript expression; the component is hidden when it evaluates falsy. */
   visible?: string;
+  /**
+   * Stretch the component down to the bottom of its band once the band height
+   * is known, e.g. so bordered table cells line up when a neighbour grows.
+   */
+  growToHeight?: boolean;
 }
 
 export interface TextComponent extends ComponentBase {
