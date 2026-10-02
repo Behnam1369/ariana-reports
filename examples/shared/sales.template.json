@@ -1,0 +1,231 @@
+{
+  "schemaVersion": 1,
+  "name": "Sales by customer",
+  "description": "Orders grouped by customer with line items, subtotals and a grand total.",
+  "unit": "mm",
+  "locale": "en-US",
+  "page": {
+    "size": "A4",
+    "orientation": "portrait",
+    "margins": { "top": 12, "right": 12, "bottom": 12, "left": 12 }
+  },
+  "dataSources": [
+    {
+      "name": "orders",
+      "fields": [
+        { "name": "id", "type": "number" },
+        { "name": "customer", "type": "string" },
+        { "name": "date", "type": "date" },
+        { "name": "status", "type": "string" },
+        {
+          "name": "items",
+          "type": "array",
+          "fields": [
+            { "name": "product", "type": "string" },
+            { "name": "qty", "type": "number" },
+            { "name": "price", "type": "number" }
+          ]
+        },
+        { "name": "total", "type": "number" }
+      ]
+    },
+    { "name": "company", "fields": [{ "name": "name", "type": "string" }, { "name": "city", "type": "string" }] }
+  ],
+  "parameters": [{ "name": "title", "type": "string", "label": "Title", "defaultValue": "Sales by customer" }],
+  "styles": {
+    "title": { "fontSize": 18, "fontWeight": "bold", "color": "#1f2937" },
+    "muted": { "fontSize": 8, "color": "#6b7280" },
+    "th": {
+      "fontSize": 9,
+      "fontWeight": "bold",
+      "color": "#ffffff",
+      "backgroundColor": "#1f2937",
+      "verticalAlign": "middle",
+      "padding": 1.5
+    },
+    "td": {
+      "fontSize": 9,
+      "verticalAlign": "middle",
+      "padding": 1.5,
+      "border": { "width": 0.5, "color": "#e5e7eb", "style": "solid", "sides": ["bottom"] }
+    },
+    "money": { "textAlign": "right" }
+  },
+  "reportHeader": {
+    "id": "report_header",
+    "height": 22,
+    "components": [
+      { "id": "title", "type": "text", "x": 0, "y": 0, "width": 120, "height": 10, "styleName": "title", "text": "{{ params.title }}" },
+      { "id": "company", "type": "text", "x": 0, "y": 11, "width": 120, "height": 5, "styleName": "muted", "text": "{{ company[0].name }}, {{ company[0].city }}" },
+      {
+        "id": "printed",
+        "type": "text",
+        "x": 126,
+        "y": 11,
+        "width": 60,
+        "height": 5,
+        "styleName": "muted",
+        "style": { "textAlign": "right" },
+        "text": "Printed {{ formatDate(today(), 'd MMMM yyyy') }}"
+      },
+      { "id": "rule", "type": "line", "orientation": "horizontal", "x": 0, "y": 19, "width": 186, "height": 0, "style": { "border": { "width": 1, "color": "#1f2937", "style": "solid" } } }
+    ]
+  },
+  "pageFooter": {
+    "id": "page_footer",
+    "height": 8,
+    "components": [
+      { "id": "footer_company", "type": "text", "x": 0, "y": 2, "width": 100, "height": 5, "styleName": "muted", "text": "{{ report.name }}" },
+      {
+        "id": "page_number",
+        "type": "text",
+        "x": 126,
+        "y": 2,
+        "width": 60,
+        "height": 5,
+        "styleName": "muted",
+        "style": { "textAlign": "right" },
+        "text": "Page {{ page.number }} of {{ page.count }}"
+      }
+    ]
+  },
+  "body": [
+    {
+      "kind": "dataRegion",
+      "id": "orders_region",
+      "dataSource": "orders",
+      "sort": [{ "expression": "row.date", "direction": "asc" }],
+      "repeatHeaderOnEachPage": true,
+      "header": {
+        "id": "columns",
+        "height": 7,
+        "components": [
+          { "id": "th_order", "type": "text", "x": 0, "y": 0, "width": 24, "height": 7, "styleName": "th", "text": "Order" },
+          { "id": "th_date", "type": "text", "x": 24, "y": 0, "width": 30, "height": 7, "styleName": "th", "text": "Date" },
+          { "id": "th_item", "type": "text", "x": 54, "y": 0, "width": 82, "height": 7, "styleName": "th", "text": "Items" },
+          { "id": "th_status", "type": "text", "x": 136, "y": 0, "width": 20, "height": 7, "styleName": "th", "text": "Status" },
+          { "id": "th_total", "type": "text", "x": 156, "y": 0, "width": 30, "height": 7, "styleName": "th", "style": { "textAlign": "right" }, "text": "Total" }
+        ]
+      },
+      "groups": [
+        {
+          "id": "by_customer",
+          "expression": "row.customer",
+          "header": {
+            "id": "customer_header",
+            "height": 9,
+            "components": [
+              {
+                "id": "customer_name",
+                "type": "text",
+                "x": 0,
+                "y": 2,
+                "width": 186,
+                "height": 7,
+                "style": { "fontSize": 11, "fontWeight": "bold", "color": "#1d4ed8", "verticalAlign": "bottom" },
+                "text": "{{ group.key }} ({{ group.count }} orders)"
+              }
+            ]
+          },
+          "footer": {
+            "id": "customer_footer",
+            "height": 8,
+            "components": [
+              {
+                "id": "customer_total_label",
+                "type": "text",
+                "x": 100,
+                "y": 0,
+                "width": 56,
+                "height": 7,
+                "style": { "fontSize": 9, "fontWeight": "bold", "textAlign": "right", "verticalAlign": "middle", "padding": 1.5 },
+                "text": "Subtotal {{ group.key }}"
+              },
+              {
+                "id": "customer_total",
+                "type": "text",
+                "x": 156,
+                "y": 0,
+                "width": 30,
+                "height": 7,
+                "styleName": "money",
+                "style": { "fontSize": 9, "fontWeight": "bold", "verticalAlign": "middle", "padding": 1.5, "border": { "width": 1, "color": "#1f2937", "style": "solid", "sides": ["top"] } },
+                "format": { "type": "currency", "currency": "USD" },
+                "text": "{{ sum(group.rows, r => r.total) }}"
+              }
+            ]
+          }
+        }
+      ],
+      "detail": {
+        "id": "order_row",
+        "height": 6,
+        "components": [
+          { "id": "order_id", "type": "text", "x": 0, "y": 0, "width": 24, "height": 6, "styleName": "td", "text": "#{{ row.id }}" },
+          { "id": "order_date", "type": "text", "x": 24, "y": 0, "width": 30, "height": 6, "styleName": "td", "format": { "type": "date", "pattern": "dd MMM yyyy" }, "text": "{{ row.date }}" },
+          {
+            "id": "order_items",
+            "type": "text",
+            "x": 54,
+            "y": 0,
+            "width": 82,
+            "height": 6,
+            "styleName": "td",
+            "canGrow": true,
+            "text": "{{ row.items.map(i => `${i.qty} × ${i.product}`).join(', ') }}"
+          },
+          {
+            "id": "order_status",
+            "type": "text",
+            "x": 136,
+            "y": 0,
+            "width": 20,
+            "height": 6,
+            "styleName": "td",
+            "conditions": [{ "expression": "row.status === 'open'", "style": { "color": "#b91c1c", "fontWeight": "bold" } }],
+            "text": "{{ upper(row.status) }}"
+          },
+          {
+            "id": "order_total",
+            "type": "text",
+            "x": 156,
+            "y": 0,
+            "width": 30,
+            "height": 6,
+            "styleName": "td",
+            "style": { "textAlign": "right" },
+            "format": { "type": "currency", "currency": "USD" },
+            "text": "{{ row.total }}"
+          }
+        ]
+      },
+      "footer": {
+        "id": "grand_total_band",
+        "height": 12,
+        "components": [
+          {
+            "id": "grand_total_label",
+            "type": "text",
+            "x": 100,
+            "y": 3,
+            "width": 56,
+            "height": 8,
+            "style": { "fontSize": 11, "fontWeight": "bold", "textAlign": "right", "verticalAlign": "middle", "padding": 1.5 },
+            "text": "Grand total ({{ rows.length }} orders)"
+          },
+          {
+            "id": "grand_total",
+            "type": "text",
+            "x": 156,
+            "y": 3,
+            "width": 30,
+            "height": 8,
+            "style": { "fontSize": 11, "fontWeight": "bold", "textAlign": "right", "verticalAlign": "middle", "padding": 1.5, "backgroundColor": "#f3f4f6" },
+            "format": { "type": "currency", "currency": "USD" },
+            "text": "{{ sum(rows, 'total') }}"
+          }
+        ]
+      }
+    }
+  ]
+}
