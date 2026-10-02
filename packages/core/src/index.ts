@@ -7,3 +7,4 @@ export * from './expressions';
 export * from './layout';
 export * from './export';
 export * from './viewer';
+export * from './designer';
