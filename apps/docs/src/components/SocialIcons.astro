@@ -1,0 +1,43 @@
+---
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+---
+
+<nav class="site-links" aria-label="Site">
+  <a href="/demos/">Demos</a>
+  <a href="/playground/" class="playground-link">Playground</a>
+</nav>
+<Default {...Astro.props}><slot /></Default>
+
+<style>
+  .site-links {
+    display: none;
+    gap: 0.25rem;
+    align-items: center;
+    margin-inline-end: 0.5rem;
+  }
+  .site-links a {
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.4rem;
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    font-size: var(--sl-text-sm);
+    font-weight: 500;
+  }
+  .site-links a:hover {
+    color: var(--sl-color-white);
+    background: var(--sl-color-gray-6);
+  }
+  .site-links .playground-link {
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+  }
+  .site-links .playground-link:hover {
+    background: var(--sl-color-accent-high);
+    color: var(--sl-color-black);
+  }
+  @media (min-width: 50rem) {
+    .site-links {
+      display: flex;
+    }
+  }
+</style>

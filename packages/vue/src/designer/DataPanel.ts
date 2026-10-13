@@ -1,9 +1,8 @@
 import { defineComponent, h, ref, type PropType, type VNode } from 'vue';
-import { COMPONENT_TYPES, FIELD_TYPES, findBand, type ComponentType, type FieldDefinition, type FieldType } from '@ariana-report/core';
+import { COMPONENT_TYPES, FIELD_TYPES, findBand, type FieldDefinition, type FieldType } from '@ariana-reports/core';
 import { useDesignerContext, writePayload } from './context';
-import { CheckInput, field, NumberInput, SelectInput, TextInput } from './inputs';
-
-const ICONS: Record<ComponentType, string> = { text: 'T', image: '▣', line: '—', rectangle: '▭' };
+import { CheckInput, field, NumberInput, panelSection, SelectInput, TextInput } from './inputs';
+import { icon } from '../Icon';
 
 export const Toolbox = defineComponent({
   name: 'ArToolbox',
@@ -16,8 +15,7 @@ export const Toolbox = defineComponent({
       return sections.find((x) => x.role === 'detail')?.band.id ?? sections[0]?.band.id ?? null;
     };
     return () =>
-      h('div', { class: 'ar-panel-section' }, [
-        h('h2', { class: 'ar-panel-title' }, labels.value.components),
+      panelSection(labels.value.components, [
         h(
           'div',
           { class: 'ar-toolbox' },
@@ -35,7 +33,7 @@ export const Toolbox = defineComponent({
                   if (id) controller.addComponent(id, type);
                 },
               },
-              [h('span', { 'aria-hidden': 'true' }, ICONS[type]), labels.value[type]],
+              [icon(type), labels.value[type]],
             ),
           ),
         ),
@@ -51,7 +49,7 @@ const FieldTree = defineComponent({
     path: { type: Array as PropType<string[]>, default: () => [] },
   },
   setup(props) {
-    const { controller, state } = useDesignerContext();
+    const { controller, state, labels } = useDesignerContext();
     return (): VNode =>
       h(
         'ul',
@@ -69,12 +67,12 @@ const FieldTree = defineComponent({
                 class: 'ar-tree-item',
                 draggable: 'true',
                 tabindex: 0,
-                title: 'Drag onto a band, or press Enter to add to the selected band',
+                title: labels.value.fieldHint,
                 onDragstart: (e: DragEvent) => writePayload(e.dataTransfer, { kind: 'field', root: props.root, path: fieldPath }),
                 onDblclick: insert,
                 onKeydown: (e: KeyboardEvent) => e.key === 'Enter' && insert(),
               },
-              [h('span', f.name), h('span', { class: 'ar-tree-type' }, f.type)],
+              [icon('field'), h('span', f.name), h('span', { class: 'ar-tree-type' }, f.type)],
             ),
             f.fields?.length && f.type === 'object' ? h(FieldTree, { fields: f.fields, root: props.root, path: fieldPath }) : null,
             f.fields?.length && f.type === 'array' ? h(FieldTree, { fields: f.fields, root: 'row', path: [] }) : null,
@@ -84,7 +82,7 @@ const FieldTree = defineComponent({
   },
 });
 
-function addForm(label: string, button: string, onAdd: (name: string) => void, name: { value: string }, error: { value: string | null }): VNode[] {
+function addForm(label: string, placeholder: string, button: string, onAdd: (name: string) => void, name: { value: string }, error: { value: string | null }): VNode[] {
   return [
     h(
       'form',
@@ -105,8 +103,8 @@ function addForm(label: string, button: string, onAdd: (name: string) => void, n
         },
       },
       [
-        h('input', { class: 'ar-input', 'aria-label': label, placeholder: 'name', value: name.value, onInput: (e: Event) => (name.value = (e.target as HTMLInputElement).value) }),
-        h('button', { type: 'submit', class: 'ar-btn' }, button),
+        h('input', { class: 'ar-input', 'aria-label': label, placeholder, value: name.value, onInput: (e: Event) => (name.value = (e.target as HTMLInputElement).value) }),
+        h('button', { type: 'submit', class: 'ar-btn ar-btn-outline' }, [icon('plus'), button]),
       ],
     ),
     error.value ? h('p', { class: 'ar-field-error', role: 'alert' }, error.value) : (null as unknown as VNode),
@@ -122,24 +120,26 @@ export const DataPanel = defineComponent({
     return () => {
       const l = labels.value;
       const hasSample = controller.getSampleData() !== undefined;
-      return h('div', { class: 'ar-panel-section' }, [
-        h('h2', { class: 'ar-panel-title' }, l.data),
+      return panelSection(l.data, [
         ...state.value.template.dataSources.map((ds) =>
-          h('details', { key: ds.name, open: true }, [
-            h('summary', [h('strong', ds.name)]),
-            field('Source name', (id) => h(TextInput, { id, value: ds.name, onCommit: (v: string) => v && controller.updateDataSource(ds.name, { name: v }) })),
-            field('Source path', (id) =>
+          h('details', { key: ds.name, class: 'ar-source', open: true }, [
+            h('summary', [icon('database'), h('span', ds.name)]),
+            h('div', { class: 'ar-source-body' }, [
+            field(l.sourceName, (id) => h(TextInput, { id, value: ds.name, onCommit: (v: string) => v && controller.updateDataSource(ds.name, { name: v }) })),
+            field(l.sourcePath, (id) =>
               h(TextInput, { id, value: ds.path ?? '', placeholder: ds.name, onCommit: (v: string) => controller.updateDataSource(ds.name, { path: v || undefined }) }),
             ),
             h('div', { class: 'ar-field-row' }, [
               hasSample ? h('button', { type: 'button', class: 'ar-btn', onClick: () => controller.inferDataSourceFields(ds.name) }, l.inferFields) : null,
               h('button', { type: 'button', class: 'ar-btn ar-btn-danger', 'aria-label': `${l.delete} ${ds.name}`, onClick: () => controller.removeDataSource(ds.name) }, l.delete),
             ]),
-            ds.fields?.length ? h(FieldTree, { fields: ds.fields, root: 'row' }) : h('p', { class: 'ar-hint' }, 'No fields.'),
+            ds.fields?.length ? h(FieldTree, { fields: ds.fields, root: 'row' }) : h('p', { class: 'ar-hint' }, l.noFields),
+            ]),
           ]),
         ),
         ...addForm(
-          'New data source name',
+          l.newDataSourceName,
+          l.namePlaceholder,
           l.addDataSource,
           (n) => {
             controller.addDataSource({ name: n });
@@ -161,16 +161,16 @@ export const ParametersPanel = defineComponent({
     const error = ref<string | null>(null);
     return () => {
       const l = labels.value;
-      return h('div', { class: 'ar-panel-section' }, [
-        h('h2', { class: 'ar-panel-title' }, l.parameters),
+      return panelSection(l.parameters, [
         ...(state.value.template.parameters ?? []).map((p) =>
-          h('details', { key: p.name }, [
-            h('summary', ['params.', h('strong', p.name)]),
-            field('Parameter label', (id) => h(TextInput, { id, value: p.label ?? '', onCommit: (v: string) => controller.updateParameter(p.name, { label: v || undefined }) })),
-            field('Parameter type', (id) =>
-              h(SelectInput, { id, value: p.type, options: FIELD_TYPES, onChange: (v?: string) => v && controller.updateParameter(p.name, { type: v as FieldType }) }),
+          h('details', { key: p.name, class: 'ar-source' }, [
+            h('summary', [icon('parameter'), h('span', `params.${p.name}`)]),
+            h('div', { class: 'ar-source-body' }, [
+            field(l.parameterLabel, (id) => h(TextInput, { id, value: p.label ?? '', onCommit: (v: string) => controller.updateParameter(p.name, { label: v || undefined }) })),
+            field(l.parameterType, (id) =>
+              h(SelectInput, { id, value: p.type, options: FIELD_TYPES, translate: true, onChange: (v?: string) => v && controller.updateParameter(p.name, { type: v as FieldType }) }),
             ),
-            field('Default value', (id) =>
+            field(l.defaultValue, (id) =>
               p.type === 'number'
                 ? h(NumberInput, {
                     id,
@@ -187,9 +187,10 @@ export const ParametersPanel = defineComponent({
                     }),
             ),
             h('button', { type: 'button', class: 'ar-btn ar-btn-danger', 'aria-label': `${l.delete} params.${p.name}`, onClick: () => controller.removeParameter(p.name) }, l.delete),
+            ]),
           ]),
         ),
-        ...addForm('New parameter name', l.addParameter, (n) => controller.addParameter({ name: n, type: 'string' }), name, error),
+        ...addForm(l.newParameterName, l.namePlaceholder, l.addParameter, (n) => controller.addParameter({ name: n, type: 'string' }), name, error),
       ]);
     };
   },

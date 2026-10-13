@@ -1,0 +1,86 @@
+---
+title: Vite, Next.js and Nuxt
+description: Using ariana-report in common setups, including server-side rendering.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+The packages work in any bundler without configuration. This page covers the setups that need a few extra words.
+
+## Server-side rendering
+
+Both components are safe to render on the server. They do not touch `window` or `document` until they are mounted (tests render them in a plain Node environment). On the server you get the toolbar and panels; the report itself is generated in the browser after hydration, because layout depends on browser fonts.
+
+So you never have to turn SSR off, but you can if you prefer the report area to appear at once instead of after hydration.
+
+## Vite
+
+Nothing to configure. Import the component and give its parent a height. pdf-lib and exceljs are split into separate chunks and downloaded only when someone exports.
+
+## Next.js (App Router)
+
+`@ariana-reports/react` is marked with the `"use client"` directive, so you can import the components straight into a Server Component page:
+
+```tsx title="app/reports/page.tsx"
+import { ReportViewer } from '@ariana-reports/react';
+import { loadTemplate, loadData } from '@/lib/reports';
+
+export default async function Page() {
+  const [template, data] = await Promise.all([loadTemplate(), loadData()]);
+  return (
+    <div style={{ height: '80vh' }}>
+      {/* Props must be serializable: plain JSON is. */}
+      <ReportViewer template={template} data={data} />
+    </div>
+  );
+}
+```
+
+Props that are functions (`onError`, `onSave`, `functions`, `allowImageSrc`) cannot cross from a Server Component to a client component. Put the component in your own client file for those:
+
+```tsx title="components/Designer.tsx"
+'use client';
+import { ReportDesigner } from '@ariana-reports/react';
+
+export function Designer({ template }: { template: object }) {
+  return <ReportDesigner template={template as never} onSave={async (_t, json) => { await fetch('/api/templates', { method: 'PUT', body: json }); }} />;
+}
+```
+
+Because the React package is a client module, import server-side helpers such as `generateReport` or `validateTemplate` from `@ariana-reports/core` in server code.
+
+## Next.js (Pages Router)
+
+No special handling. If you want the report area to render only in the browser, use `dynamic`:
+
+```tsx
+import dynamic from 'next/dynamic';
+const ReportViewer = dynamic(() => import('@ariana-reports/react').then((m) => m.ReportViewer), { ssr: false });
+```
+
+## Nuxt
+
+Use the components in any page or component:
+
+```vue title="pages/report.vue"
+<script setup lang="ts">
+import { ReportViewer } from '@ariana-reports/vue';
+const { data: template } = await useFetch('/api/templates/sales');
+const { data } = await useFetch('/api/data/sales');
+</script>
+
+<template>
+  <div style="height: 80vh">
+    <ReportViewer :template="template" :data="data" />
+  </div>
+</template>
+```
+
+To skip server rendering of the component, wrap it in `<ClientOnly>`.
+
+## Content Security Policy
+
+The packages need no `eval` and no `new Function`: expressions run in an interpreter. PDF and Excel export create `Blob` downloads. If you use a strict CSP:
+
+- `style-src` must allow the injected stylesheet. Either allow `'unsafe-inline'` for styles, or set `injectStyles={false}` / `:inject-styles="false"` and include the CSS yourself (it is exported as `ARIANA_STYLES`).
+- `img-src` must allow the image sources your templates use (`data:`, `blob:` and your image host).

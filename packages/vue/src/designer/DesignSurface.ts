@@ -1,16 +1,21 @@
 import { defineComponent, h, ref, type PropType } from 'vue';
 import {
+  bandColorVars,
   componentPreview,
   designScale,
+  DROP_TARGET_CLASS,
+  marqueeTargets,
   RESIZE_HANDLES,
   rectFromPoints,
+  snapshotBands,
   snapToGrid,
   type DesignSection,
   type Rect,
   type ReportComponent,
   type ResizeHandle,
-} from '@ariana-report/core';
+} from '@ariana-reports/core';
 import { DND_TYPE, readPayload, useDesignerContext } from './context';
+import { icon } from '../Icon';
 
 const isEditable = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
@@ -43,11 +48,6 @@ function trackPointer(
   view.addEventListener('pointercancel', up);
 }
 
-function bandAtPoint(doc: Document, x: number, y: number): HTMLElement | null {
-  const el = typeof doc.elementFromPoint === 'function' ? doc.elementFromPoint(x, y) : null;
-  return (el?.closest('[data-band-id]') as HTMLElement | null) ?? null;
-}
-
 const ComponentView = defineComponent({
   name: 'ArComponentView',
   props: {
@@ -56,7 +56,7 @@ const ComponentView = defineComponent({
     scale: { type: Number, required: true },
   },
   setup(props) {
-    const { controller, state, zoom } = useDesignerContext();
+    const { controller, state, zoom, openTextEditor } = useDesignerContext();
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
@@ -69,24 +69,35 @@ const ComponentView = defineComponent({
       }
       if (!selected) controller.select([c.id]);
       const ids = controller.getState().selection.componentIds;
-      const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const s = props.scale;
-      const grab = { x: (e.clientX - box.left) / s, y: (e.clientY - box.top) / s };
+      const bandId = props.bandId;
+      // Band positions at drag start: dragging over another band moves the selection into it.
+      const el = e.currentTarget as HTMLElement;
+      const bandAt = snapshotBands(el.closest('.ar-surface') ?? el.ownerDocument);
+      const source = bandAt ? (el.closest('[data-band-id]') as HTMLElement | null)?.getBoundingClientRect() : undefined;
+      let highlighted: HTMLElement | null = null;
+      const highlight = (target: HTMLElement | null) => {
+        if (target === highlighted) return;
+        highlighted?.classList.remove(DROP_TARGET_CLASS);
+        target?.classList.add(DROP_TARGET_CLASS);
+        highlighted = target;
+      };
       controller.beginInteraction('Move');
       trackPointer(
         e,
-        (dx, dy, ev) => controller.moveComponents(ids, dx / s, dy / s, !ev.altKey),
-        (ev, moved) => {
-          if (!moved) return controller.endInteraction();
-          const target = bandAtPoint((e.target as Element).ownerDocument, ev.clientX, ev.clientY);
-          const targetId = target?.dataset.bandId;
-          if (target && targetId && targetId !== props.bandId && ids.length === 1) {
-            controller.cancelInteraction();
-            const r = target.getBoundingClientRect();
-            controller.moveComponentToBand(c.id, targetId, (ev.clientX - r.left) / s - grab.x, (ev.clientY - r.top) / s - grab.y);
-          } else {
-            controller.endInteraction();
+        (dx, dy, ev) => {
+          const hit = bandAt?.(ev.clientY);
+          if (!hit || !source || hit.bandId === bandId) {
+            highlight(null);
+            controller.moveComponentsToBand(ids, bandId, dx / s, dy / s, !ev.altKey);
+            return;
           }
+          highlight(hit.element);
+          controller.moveComponentsToBand(ids, hit.bandId, (dx + source.left - hit.left) / s, (dy + source.top - hit.top) / s, !ev.altKey);
+        },
+        () => {
+          highlight(null);
+          controller.endInteraction();
         },
       );
     };
@@ -94,10 +105,12 @@ const ComponentView = defineComponent({
     const onHandleDown = (handle: ResizeHandle) => (e: PointerEvent) => {
       if (e.button !== 0) return;
       e.stopPropagation();
+      // Every selected component resizes by the same amount, e.g. to change the height of a whole row.
+      const ids = controller.getState().selection.componentIds;
       controller.beginInteraction('Resize');
       trackPointer(
         e,
-        (dx, dy) => controller.resizeComponent(props.component.id, handle, dx / props.scale, dy / props.scale),
+        (dx, dy) => controller.resizeComponents(ids.length ? ids : [props.component.id], handle, dx / props.scale, dy / props.scale),
         () => controller.endInteraction(),
       );
     };
@@ -121,11 +134,14 @@ const ComponentView = defineComponent({
           'aria-label': `${c.type}: ${label}`,
           title: preview.error ?? undefined,
           onPointerdown: onPointerDown,
+          onDblclick: c.type === 'text' ? () => openTextEditor(c.id) : undefined,
         },
         [
-          c.type === 'text' ? h('span', { class: 'ar-component-text' }, preview.label) : null,
-          c.type === 'image' ? h('span', { class: 'ar-hint' }, preview.label) : null,
-          ...(selected && sel.length === 1
+          c.type === 'text'
+            ? h('span', { class: 'ar-component-body' }, preview.runs ? preview.runs.map((r, i) => h('span', { key: i, style: r.style }, r.text)) : preview.label)
+            : null,
+          c.type === 'image' ? h('span', { class: 'ar-hint ar-component-label' }, preview.label) : null,
+          ...(selected
             ? handles.map((hd) => h('span', { key: hd, class: `ar-handle ar-handle-${hd}`, 'data-handle': hd, onPointerdown: onHandleDown(hd) }))
             : []),
         ],
@@ -185,6 +201,13 @@ const BandView = defineComponent({
       );
     };
 
+    const onDragOver = (e: DragEvent) => {
+      if (Array.from(e.dataTransfer?.types ?? []).some((t) => t === DND_TYPE || t === 'text/plain')) {
+        e.preventDefault();
+        dropping.value = true;
+      }
+    };
+
     const onDrop = (e: DragEvent) => {
       dropping.value = false;
       const payload = readPayload(e.dataTransfer);
@@ -208,24 +231,24 @@ const BandView = defineComponent({
       const gridPx = settings.grid * s;
       const guides = allGuides?.bandId === band.id ? allGuides.guides : [];
       const m = marquee.value;
-      return h('section', { 'aria-label': section.label }, [
+      return h('section', { 'aria-label': section.label, 'data-section-band': band.id, class: 'ar-section-band', style: bandColorVars(band.designColor) }, [
         h(
           'div',
           {
             class: 'ar-section-caption',
             'aria-selected': String(selected),
-            style: { paddingLeft: `${6 + section.depth * 12}px` },
+            style: { paddingLeft: `${8 + section.depth * 12}px` },
             onClick: () => controller.selectBand(band.id),
           },
           [
-            h('span', section.label),
+            h('span', { dir: 'auto' }, section.label),
             h('span', { class: 'ar-spacer' }),
             section.role !== 'detail'
               ? h(
                   'button',
                   {
                     type: 'button',
-                    class: 'ar-btn',
+                    class: 'ar-btn ar-btn-icon',
                     'aria-label': `${labels.value.removeBand}: ${section.label}`,
                     title: labels.value.removeBand,
                     onClick: (e: MouseEvent) => {
@@ -233,7 +256,7 @@ const BandView = defineComponent({
                       controller.removeBand(band.id);
                     },
                   },
-                  '×',
+                  [icon('close')],
                 )
               : null,
           ],
@@ -253,12 +276,7 @@ const BandView = defineComponent({
               backgroundSize: settings.showGrid && gridPx >= 4 ? `${gridPx}px ${gridPx}px` : undefined,
             },
             onPointerdown: onPointerDown,
-            onDragover: (e: DragEvent) => {
-              if (Array.from(e.dataTransfer?.types ?? []).some((t) => t === DND_TYPE || t === 'text/plain')) {
-                e.preventDefault();
-                dropping.value = true;
-              }
-            },
+            onDragover: onDragOver,
             onDragleave: () => (dropping.value = false),
             onDrop,
           },
@@ -278,6 +296,17 @@ const BandView = defineComponent({
             h('div', { class: 'ar-band-resize', 'data-band-resize': band.id, 'aria-hidden': 'true', onPointerdown: onResizeDown }),
           ],
         ),
+        // Empty strip below the band: start a rubber-band selection here when components cover the whole band.
+        h('div', {
+          class: 'ar-band-gap',
+          'data-band-gap': band.id,
+          'aria-hidden': 'true',
+          style: { width: `${width}px` },
+          onPointerdown: onPointerDown,
+          onDragover: onDragOver,
+          onDragleave: () => (dropping.value = false),
+          onDrop,
+        }),
       ]);
     };
   },
@@ -287,19 +316,68 @@ const BandView = defineComponent({
 export const DesignSurface = defineComponent({
   name: 'ArDesignSurface',
   setup() {
-    const { controller, state, zoom } = useDesignerContext();
+    const { controller, state, zoom, labels } = useDesignerContext();
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditable(e.target)) return;
       if (controller.handleKey(e)) e.preventDefault();
     };
+    const surfaceEl = ref<HTMLDivElement>();
+    const scrollEl = ref<HTMLDivElement>();
+    const marquee = ref<{ left: number; top: number; width: number; height: number } | null>(null);
+    // Rubber-band selection started outside the bands: in the page margins or around the page.
+    const onPointerDown = (e: PointerEvent) => {
+      const surface = surfaceEl.value;
+      if (e.button !== 0 || !surface || (e.target !== surface && e.target !== scrollEl.value)) return;
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      const scale = designScale(state.value.template.unit, zoom.value);
+      const start = { x: e.clientX, y: e.clientY };
+      const box = (ev: PointerEvent) => ({
+        left: Math.min(start.x, ev.clientX),
+        top: Math.min(start.y, ev.clientY),
+        right: Math.max(start.x, ev.clientX),
+        bottom: Math.max(start.y, ev.clientY),
+      });
+      trackPointer(
+        e,
+        (_dx, _dy, ev) => {
+          const b = box(ev);
+          const s = surface.getBoundingClientRect();
+          marquee.value = { left: b.left - s.left, top: b.top - s.top, width: b.right - b.left, height: b.bottom - b.top };
+        },
+        (ev, moved) => {
+          marquee.value = null;
+          if (!moved) {
+            if (!additive) controller.clearSelection();
+            return;
+          }
+          controller.selectInBands(marqueeTargets(surface, box(ev), scale), additive);
+        },
+      );
+    };
     return () => {
-      void state.value;
-      const width = controller.bodyWidth() * designScale(state.value.template.unit, zoom.value);
-      return h('div', { class: 'ar-surface-scroll', tabindex: 0, 'aria-label': 'Design surface', onKeydown: onKeyDown }, [
+      const { template, settings } = state.value;
+      const scale = designScale(template.unit, zoom.value);
+      const width = controller.bodyWidth() * scale;
+      // With margins shown the surface is the whole page and the bands sit inside the margins.
+      const m = template.page.margins;
+      const pad = settings.showMargins ? { top: m.top * scale, right: m.right * scale, bottom: m.bottom * scale, left: m.left * scale } : null;
+      const px = (v: number) => `${v}px`;
+      const mq = marquee.value;
+      return h('div', { ref: scrollEl, class: 'ar-surface-scroll', tabindex: 0, 'aria-label': labels.value.designSurface, onKeydown: onKeyDown, onPointerdown: onPointerDown }, [
         h(
           'div',
-          { class: 'ar-surface', style: { width: `${width}px` } },
-          controller.sections().map((s) => h(BandView, { key: s.band.id, section: s, width })),
+          {
+            ref: surfaceEl,
+            class: 'ar-surface',
+            style: pad
+              ? { width: px(width + pad.left + pad.right), paddingTop: px(pad.top), paddingRight: px(pad.right), paddingBottom: px(pad.bottom), paddingLeft: px(pad.left) }
+              : { width: px(width) },
+          },
+          [
+            pad ? h('div', { class: 'ar-margin-guide', 'aria-hidden': 'true', style: { top: px(pad.top), right: px(pad.right), bottom: px(pad.bottom), left: px(pad.left) } }) : null,
+            ...controller.sections(labels.value).map((s) => h(BandView, { key: s.band.id, section: s, width })),
+            mq ? h('div', { class: 'ar-marquee', style: { left: px(mq.left), top: px(mq.top), width: px(mq.width), height: px(mq.height) } }) : null,
+          ],
         ),
       ]);
     };

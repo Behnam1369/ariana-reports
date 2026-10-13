@@ -1,0 +1,134 @@
+---
+title: Saving and loading templates
+description: Store templates in your backend, load them into the designer, and validate them on the server.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+A template is a JSON document, so store it wherever you store JSON: a database column, a file, a Git repository, local storage. ariana-report does not own your storage; it gives you the JSON when the user saves, and takes it back when you load.
+
+## Save
+
+`onSave` receives the template and its JSON text. If it returns a promise, the designer waits for it and clears the "unsaved changes" mark once it resolves. If it throws, the message is shown in the designer and the changes stay marked as unsaved.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    <ReportDesigner
+      template={template}
+      sampleData={data}
+      onSave={async (_template, json) => {
+        const response = await fetch(`/api/reports/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: json,
+        });
+        if (!response.ok) throw new Error(`Save failed (${response.status})`);
+      }}
+    />
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    async function save(_template: unknown, json: string) {
+      const response = await fetch(`/api/reports/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: json,
+      });
+      if (!response.ok) throw new Error(`Save failed (${response.status})`);
+    }
+    </script>
+
+    <template>
+      <ReportDesigner :template="template" :sample-data="data" :on-save="save" />
+    </template>
+    ```
+  </TabItem>
+</Tabs>
+
+## Load
+
+The `template` prop is read when the designer mounts. Fetch the template first, then render the designer:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    function Editor({ id }: { id: string }) {
+      const [template, setTemplate] = useState<ReportTemplate>();
+      useEffect(() => {
+        fetch(`/api/reports/${id}`).then((r) => r.json()).then(setTemplate);
+      }, [id]);
+
+      if (!template) return <p>Loading…</p>;
+      // key: start a fresh designer when another report is opened
+      return <ReportDesigner key={id} template={template} sampleData={data} />;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref, watchEffect } from 'vue';
+    const props = defineProps<{ id: string }>();
+    const template = ref<ReportTemplate>();
+
+    watchEffect(async () => {
+      template.value = undefined;
+      template.value = await (await fetch(`/api/reports/${props.id}`)).json();
+    });
+    </script>
+
+    <template>
+      <p v-if="!template">Loading…</p>
+      <!-- key: start a fresh designer when another report is opened -->
+      <ReportDesigner v-else :key="id" :template="template" :sample-data="data" />
+    </template>
+    ```
+  </TabItem>
+</Tabs>
+
+To switch templates without remounting, create a `DesignerController` and call `controller.load(template)`. It throws for an invalid template, so catch it.
+
+## Autosave
+
+`onChange` (React) / `@change` (Vue) fires after every edit. Debounce it, and use the controller's `dirty` flag if you need the "unsaved" state:
+
+```ts
+let timer: ReturnType<typeof setTimeout>;
+const onChange = (template: ReportTemplate) => {
+  clearTimeout(timer);
+  timer = setTimeout(() => saveDraft(template), 1500);
+};
+```
+
+## Show a stored report
+
+Give the saved template and fresh data to the viewer:
+
+```tsx
+<ReportViewer template={savedTemplate} data={await loadData()} params={{ month: '2026-03' }} />
+```
+
+## Validate on the server
+
+Never trust a template just because the designer made it. Validate on the server with the core package, which runs in Node:
+
+```ts
+import { parseTemplate, TemplateValidationError } from '@ariana-reports/core';
+
+app.put('/api/reports/:id', (req, res) => {
+  try {
+    const template = parseTemplate(req.body); // throws for invalid templates
+    // store JSON.stringify(template)
+  } catch (error) {
+    if (error instanceof TemplateValidationError) return res.status(400).json({ errors: error.errors });
+    throw error;
+  }
+});
+```
+
+## Versions
+
+Templates carry `schemaVersion`. Keep it in what you store; when the format changes in a future release, old templates will be upgraded when they are loaded.

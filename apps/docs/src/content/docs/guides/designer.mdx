@@ -1,0 +1,92 @@
+---
+title: The designer
+description: Props, shortcuts and the controller API of the visual designer.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Demo from '../../../components/Demo.astro';
+
+`ReportDesigner` is a banded design surface with a toolbox, a data panel, a properties panel and a live preview.
+
+## Props
+
+| Prop | Description |
+| --- | --- |
+| `template` | The starting template (object or JSON text). Later changes to the prop are ignored; use the controller to load another template. |
+| `sampleData` | JSON data used to detect fields and for the preview tab. |
+| `onChange` / `@change` | Called after every edit with the new template. |
+| `onSave` / `:on-save` | Called when the user clicks *Save*, with `(template, json)`. May return a promise. Without it, *Save* downloads a `.json` file. |
+| `settings` | Initial grid, snapping and margin settings: `grid`, `showGrid`, `snapToGrid`, `snapToObjects`, `snapTolerance`, `showMargins`. |
+| `fonts` | Extra font families for the font lists, see [Fonts](/guides/fonts/#the-designers-font-list). |
+| `preview` | Options for the preview tab: `params`, `measurer`, `pdf`, `excel`. |
+| `uiLocale`, `labels` | [User interface language](/guides/languages/) and label overrides. |
+| `theme` | [Colors, radius and font](/guides/theming/). |
+| `controller` | An external `DesignerController`. |
+| `injectStyles` | Add the default stylesheet (default true). |
+
+## Working on the surface
+
+- **Select** by clicking, with Shift or Ctrl to add more, or by dragging a rubber band in a band, in the empty strip under a band, or in the page margin. Ctrl/Cmd+A selects everything in the band.
+- **Move** by dragging, or with the arrow keys (Shift or Alt for fine steps). Dragging over another band moves the components into it. Alt while dragging turns snapping off.
+- **Resize** with the eight handles on the edge of every selected component. With several components selected, one handle resizes all of them by the same amount.
+- **Resize a band** by dragging its bottom edge.
+- **Edit text** in the properties panel or, with a double click, in a large editor with formatting buttons and a searchable list of fields, variables and functions. Ctrl+Enter applies; Esc cancels.
+- **Alignment buttons** in the toolbar align the *content* of the selected text boxes (left, center, right, justify, top, middle, bottom) and show the current state. Use *distribute*, *bring to front* and *send to back* for box positions.
+- **Band colors**: each band's caption uses a dark color and its area a light tint. Change it in the band's properties; it only affects the designer.
+- **Margins** are drawn as a dashed frame. The **Margins**, **Grid** and **Snap** buttons toggle the guides.
+
+## Keyboard shortcuts
+
+| Keys | Action |
+| --- | --- |
+| Arrows | Move the selection (Shift or Alt: fine steps) |
+| Delete | Remove the selection |
+| Ctrl/Cmd + Z, Shift + Z, Y | Undo, redo |
+| Ctrl/Cmd + C, X, V, D | Copy, cut, paste, duplicate |
+| Ctrl/Cmd + A | Select the band's components |
+| Escape | Cancel a drag, or clear the selection |
+
+## The controller
+
+The designer is a view over a framework-neutral `DesignerController`. Create one yourself to read or change the template from your own UI:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { ReportDesigner, useDesigner } from '@ariana-reports/react';
+
+    function Editor({ template }) {
+      const { controller, state } = useDesigner({ template });
+      return (
+        <>
+          <button disabled={!state.canUndo} onClick={() => controller.undo()}>Undo</button>
+          <span>{state.dirty ? 'Unsaved changes' : 'Saved'}</span>
+          <ReportDesigner controller={controller} />
+        </>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ReportDesigner, useDesigner } from '@ariana-reports/vue';
+
+    const props = defineProps<{ template: object }>();
+    const { controller, state } = useDesigner({ template: props.template as never });
+    </script>
+
+    <template>
+      <button :disabled="!state.canUndo" @click="controller.undo()">Undo</button>
+      <span>{{ state.dirty ? 'Unsaved changes' : 'Saved' }}</span>
+      <ReportDesigner :controller="controller" />
+    </template>
+    ```
+  </TabItem>
+</Tabs>
+
+Useful members: `template`, `toJSON()`, `load(template)`, `markSaved()`, `undo()`, `redo()`, `select(ids)`, `addComponent(bandId, type)`, `insertField(bandId, path)`, `moveComponents`, `resizeComponents`, `setTextAlign`, `addStaticBand()`, `addDataRegion(source)`, `addGroup(regionId, expression)`, `addChildRegion`, `setPageBand`, `updateTemplate`, `inferDataSourceFields(name)`, `preview()` and `subscribe(listener)`. The state has the `template`, `selection`, `settings`, `canUndo`, `canRedo`, `dirty` and `errors`. Every edit makes a new template object, so you can compare by reference.
+
+## Try it
+
+<Demo name="designer-basic" example="sales" height={640} />

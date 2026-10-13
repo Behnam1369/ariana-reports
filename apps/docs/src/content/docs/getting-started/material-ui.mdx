@@ -1,0 +1,113 @@
+---
+title: Material UI and other design systems
+description: Make the viewer and designer match your application theme.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Demo from '../../../components/Demo.astro';
+
+The viewer and designer take every color, the corner radius and the font from CSS variables. The `theme` prop sets them, and `themeFromMui` builds that theme from a Material UI theme in one call. When your app switches between light and dark mode, the report UI follows.
+
+## Material UI
+
+```tsx title="ReportScreen.tsx"
+import { useMemo } from 'react';
+import { useTheme } from '@mui/material/styles';
+import { ReportDesigner, ReportViewer, themeFromMui } from '@ariana-reports/react';
+
+export function ReportScreen({ template, data }) {
+  const muiTheme = useTheme();
+  // Memoize: a new object on every render would re-apply the variables each time.
+  const theme = useMemo(() => themeFromMui(muiTheme), [muiTheme]);
+
+  return (
+    <>
+      <div style={{ height: 600 }}>
+        <ReportViewer theme={theme} template={template} data={data} />
+      </div>
+      <div style={{ height: 800 }}>
+        <ReportDesigner theme={theme} template={template} sampleData={data} />
+      </div>
+    </>
+  );
+}
+```
+
+`themeFromMui` reads the palette (`primary.main`, `background`, `text`, `divider`, `error`), `palette.mode`, `shape.borderRadius` and `typography.fontFamily`/`fontSize`. It accepts any object of that shape, so the packages have no dependency on Material UI. Use the second argument to override single values:
+
+```ts
+themeFromMui(muiTheme, { bandColor: muiTheme.palette.grey[800], radius: 8 });
+```
+
+The result is a plain object. The pages and the design surface stay white like paper in every theme, because a report is a printed document.
+
+## Vuetify and other libraries
+
+Build the theme object yourself from your design system's tokens. Every property is optional:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { ReportViewer, type ArianaTheme } from '@ariana-reports/react';
+
+    const theme: ArianaTheme = {
+      mode: 'light',
+      primary: 'var(--brand-500)',
+      surface: 'var(--surface)',
+      border: 'var(--border)',
+      text: 'var(--text)',
+      radius: 8,
+      fontFamily: 'Inter, sans-serif',
+    };
+
+    <ReportViewer theme={theme} template={template} data={data} />;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { computed } from 'vue';
+    import { useTheme } from 'vuetify';
+    import { ReportViewer, type ArianaTheme } from '@ariana-reports/vue';
+
+    const vuetify = useTheme();
+    // Re-computed when the Vuetify theme switches between light and dark.
+    const theme = computed<ArianaTheme>(() => {
+      const c = vuetify.current.value.colors;
+      return {
+        mode: vuetify.current.value.dark ? 'dark' : 'light',
+        primary: c.primary,
+        onPrimary: c['on-primary'],
+        background: c.background,
+        surface: c.surface,
+        text: c['on-surface'],
+        danger: c.error,
+      };
+    });
+    </script>
+
+    <template>
+      <ReportViewer :theme="theme" :template="template" :data="data" />
+    </template>
+    ```
+  </TabItem>
+</Tabs>
+
+Values can be any CSS color, including `var(--your-token)`.
+
+## Try the themes
+
+<Demo name="viewer-theme" example="sales" height={520} />
+
+## Plain CSS
+
+Without the prop, set the variables in a rule for `.ar-root`. The package's defaults have zero specificity, so your rule wins whatever the stylesheet order:
+
+```css
+.ar-root {
+  --ar-primary: #6750a4;
+  --ar-radius: 12px;
+}
+```
+
+See [Theming](/guides/theming/) for the list of variables.

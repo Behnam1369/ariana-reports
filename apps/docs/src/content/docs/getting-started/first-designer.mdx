@@ -1,0 +1,76 @@
+---
+title: Your first designer
+description: Add the visual report designer to your app and save templates.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Demo from '../../../components/Demo.astro';
+
+The designer edits a template visually. Give it a starting template (or none for a blank report), some sample data so it can list the fields, and a function that saves the result.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx title="SalesDesigner.tsx"
+    import { ReportDesigner } from '@ariana-reports/react';
+    import template from './sales.template.json';
+    import data from './sales.data.json';
+
+    export function SalesDesigner() {
+      return (
+        <div style={{ height: '100vh' }}>
+          <ReportDesigner
+            template={template}
+            sampleData={data}
+            onSave={async (_template, json) => {
+              await fetch('/api/reports/sales', { method: 'PUT', body: json });
+            }}
+          />
+        </div>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue title="SalesDesigner.vue"
+    <script setup lang="ts">
+    import { ReportDesigner } from '@ariana-reports/vue';
+    import template from './sales.template.json';
+    import data from './sales.data.json';
+
+    async function save(_template: unknown, json: string) {
+      await fetch('/api/reports/sales', { method: 'PUT', body: json });
+    }
+    </script>
+
+    <template>
+      <div style="height: 100vh">
+        <ReportDesigner :template="template" :sample-data="data" :on-save="save" />
+      </div>
+    </template>
+    ```
+  </TabItem>
+</Tabs>
+
+## Try it
+
+Drag a *Text* from the left panel onto a band, drag a field from the *Data* tree to bind it, and press **Preview** to see the report with the sample data.
+
+<Demo name="designer-basic" example="sales" height={640} />
+
+## What you can do in the designer
+
+- **Add components** (text, image, line, rectangle) by dragging them from the toolbox, or by clicking one to add it to the selected band. Drag **data fields** from the tree onto a band to create a bound text.
+- **Move and resize** with the mouse. Handles sit on the edges of every selected component, so you can resize a whole row at once. Snapping to the grid and to other components helps with alignment, and Alt disables it while dragging.
+- **Move components between bands** by dragging them over another band.
+- **Select several** by dragging a rubber band, also from the empty strip below a band or from the page margin.
+- **Edit text** in the properties panel, or double-click a text to open a large editor with formatting buttons and a searchable list of fields and functions.
+- **Add bands:** headers and footers, data bands, groups and master-detail, from the *Report* properties.
+- **Style** with fonts, colors, borders and conditions, and save styles by name.
+- **Undo and redo**, copy and paste, and keyboard shortcuts.
+- **Preview** the real report with your sample data.
+
+Read the [designer guide](/guides/designer/) for the full list of props, shortcuts and the controller API.
+
+## Saving and loading
+
+The designer does not own your storage. It calls `onSave(template, json)` when the user clicks *Save* (and downloads a `.json` file when you give no handler). To load a template, pass it as the `template` prop when the designer mounts. See [Saving and loading templates](/guides/saving/).

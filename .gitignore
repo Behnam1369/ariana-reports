@@ -5,3 +5,8 @@ coverage/
 .DS_Store
 .vite/
 *.tsbuildinfo
+
+# documentation site
+apps/docs/.api-tmp/
+apps/docs/src/content/docs/api/
+apps/docs/.astro/

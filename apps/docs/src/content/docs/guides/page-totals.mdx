@@ -1,0 +1,27 @@
+---
+title: Running totals per page
+description: Brought-forward and carried-forward lines with page.regions.
+---
+
+Accounting reports often show "carried forward" at the bottom of each page and "brought forward" at the top of the next. `page.regions` makes that possible.
+
+For every data region (by its `id`), `page.regions.<regionId>` has:
+
+| Property | Rows |
+| --- | --- |
+| `rows` | detail rows printed on this page |
+| `before` | rows on earlier pages |
+| `through` | rows up to and including this page |
+
+Put the brought-forward line in a region header with `repeatHeaderOnEachPage` and `canShrink`, and the carried-forward line in the page footer:
+
+```text
+region header:  {{ sum(page.regions.lines.before, 'debit') }}   visible: page.number > 1
+page footer:    {{ sum(page.regions.lines.through, 'debit') }}  visible: page.number < page.count
+```
+
+- In **page headers and footers** the values are complete for the page, because the page is laid out before they are filled in.
+- In **body bands**, `rows` and `through` only include rows placed so far on the current page.
+- `page.count` is the total number of pages, available in every band.
+
+The `examples/shared/journal-entry.template.json` file in the repository is a full example with debit and credit columns.

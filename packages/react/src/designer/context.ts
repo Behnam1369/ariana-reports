@@ -1,12 +1,20 @@
 import { createContext, useContext } from 'react';
-import type { DesignerController, DesignerState, Labels } from '@ariana-report/core';
+import type { DesignerController, DesignerState, Labels } from '@ariana-reports/core';
 
 export interface DesignerContextValue {
   controller: DesignerController;
   state: DesignerState;
   labels: Labels;
+  /** Translations of option values shown in selects (see `UiLocale.values`). */
+  values: Record<string, string>;
+  /** Writing direction of the UI. */
+  dir: 'ltr' | 'rtl';
   /** Design surface zoom. */
   zoom: number;
+  /** Font families offered in the font lists. */
+  fonts: string[];
+  /** Opens the large text editor dialog for a text component. */
+  openTextEditor: (componentId: string) => void;
 }
 
 export const DesignerContext = createContext<DesignerContextValue | null>(null);

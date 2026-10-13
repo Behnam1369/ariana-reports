@@ -1,4 +1,4 @@
-import type { ReportTemplate } from '@ariana-report/core';
+import type { ReportTemplate } from '@ariana-reports/core';
 
 /** Small report: title, one data band with a header and a footer total. 3 rows fit on page 1. */
 export function salesTemplate(): ReportTemplate {

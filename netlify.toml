@@ -1,0 +1,19 @@
+# Documentation site (apps/docs). Netlify builds from the repository root.
+[build]
+  command = "corepack enable && corepack pnpm install --frozen-lockfile && corepack pnpm --filter docs build"
+  publish = "apps/docs/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[headers]]
+  for = "/_astro/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"

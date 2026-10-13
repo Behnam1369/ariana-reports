@@ -1,0 +1,60 @@
+---
+title: ariana-report
+description: Banded reports for React and Vue. JSON templates, a visual designer, a viewer, and PDF and Excel export. Everything runs in the browser.
+template: splash
+hero:
+  tagline: Banded reports for React and Vue. Design a report visually, fill it with JSON data, and export it to PDF or Excel. No server needed.
+  actions:
+    - text: Get started
+      link: /getting-started/introduction/
+      icon: right-arrow
+    - text: Open the playground
+      link: /playground/
+      variant: secondary
+    - text: Live demos
+      link: /demos/
+      variant: minimal
+---
+
+import Demo from '../../components/Demo.astro';
+
+<div class="feature-grid">
+  <div>
+    <h3>Banded layout</h3>
+    <p>Report and page headers and footers, data bands, groups with subtotals and master-detail, with automatic pagination.</p>
+  </div>
+  <div>
+    <h3>Plain JSON in, plain JSON out</h3>
+    <p>A report is a JSON template. Data is any JSON object. Store templates in your database or in Git.</p>
+  </div>
+  <div>
+    <h3>Visual designer</h3>
+    <p>Drag and drop, snapping, field binding, expression checking, undo and redo, a live preview, and a large text editor.</p>
+  </div>
+  <div>
+    <h3>PDF, Excel and print</h3>
+    <p>Vector PDF and typed Excel cells from the same layout the viewer shows. Generated in the browser.</p>
+  </div>
+  <div>
+    <h3>React and Vue</h3>
+    <p>The same features, props and labels in both. A framework-free core is available for everything else.</p>
+  </div>
+  <div>
+    <h3>Safe expressions</h3>
+    <p>Templates use JavaScript expressions that run in a sandboxed interpreter. No <code>eval</code>, no globals.</p>
+  </div>
+  <div>
+    <h3>Themeable</h3>
+    <p>Follows your app theme through CSS variables. One call converts a Material UI theme, dark mode included.</p>
+  </div>
+  <div>
+    <h3>Localized</h3>
+    <p>Number and date formatting per locale, and a fully translated, right-to-left user interface. Persian is built in.</p>
+  </div>
+</div>
+
+## See it work
+
+This report is generated in your browser from a JSON template and JSON data. Scroll through the pages, zoom, or download it as PDF or Excel. Switch between React and Vue to see the code for each.
+
+<Demo name="viewer-grouping" example="sales" height={560} />

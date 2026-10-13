@@ -4,6 +4,8 @@ import { mergeStyles, resolveStyle } from '../layout/style';
 import { LINE_HEIGHT_FACTOR } from '../layout/text';
 import { cssColor, cssFontFamily, PX_PER_PT } from '../viewer/render';
 import { compileText } from '../expressions';
+import { walkBands } from '../model/walk';
+import { parseHtmlText, resolveRuns } from '../layout/html';
 
 /** CSS pixels per template unit at a zoom level. */
 export function designScale(unit: Unit, zoom = 1): number {
@@ -18,6 +20,11 @@ export interface ComponentPreview {
   label: string;
   /** Syntax error in the component's text or src, if any. */
   error: string | null;
+  /**
+   * For text components with `allowHtml`: the label split into styled runs
+   * (render each as a text span with its camelCase CSS `style`). Null otherwise.
+   */
+  runs: { text: string; style: Record<string, string> }[] | null;
 }
 
 /**
@@ -37,6 +44,7 @@ export function componentPreview(c: ReportComponent, template: ReportTemplate, z
   };
   let label = '';
   let error: string | null = null;
+  let runs: ComponentPreview['runs'] = null;
   const bg = cssColor(resolved.backgroundColor);
   const border = (prefix = 'border') => {
     const b = resolved.border;
@@ -72,8 +80,29 @@ export function componentPreview(c: ReportComponent, template: ReportTemplate, z
         flexDirection: 'column',
         justifyContent: resolved.verticalAlign === 'middle' ? 'center' : resolved.verticalAlign === 'bottom' ? 'flex-end' : 'flex-start',
       });
-      if (resolved.textDecoration !== 'none') style.textDecoration = resolved.textDecoration;
+      if (resolved.textDecoration !== 'none' && !c.allowHtml) style.textDecoration = resolved.textDecoration;
       if (c.wordWrap === false) style.whiteSpace = 'pre';
+      if (c.allowHtml) {
+        const base = {
+          bold: resolved.fontWeight === 'bold',
+          italic: resolved.fontStyle === 'italic',
+          underline: resolved.textDecoration === 'underline',
+          strike: resolved.textDecoration === 'line-through',
+          color: resolved.color,
+        };
+        runs = resolveRuns(parseHtmlText(c.text), base).map((r) => {
+          const s: Record<string, string> = {
+            fontWeight: r.bold ? 'bold' : 'normal',
+            fontStyle: r.italic ? 'italic' : 'normal',
+            color: cssColor(r.color) ?? 'transparent',
+          };
+          const deco = [r.underline && 'underline', r.strike && 'line-through'].filter(Boolean).join(' ');
+          if (deco) s.textDecoration = deco;
+          const runBg = cssColor(r.backgroundColor);
+          if (runBg) s.background = runBg;
+          return { text: r.text, style: s };
+        });
+      }
       if (bg) style.background = bg;
       border();
       break;
@@ -103,5 +132,69 @@ export function componentPreview(c: ReportComponent, template: ReportTemplate, z
       break;
     }
   }
-  return { style, label, error };
+  return { style, label, error, runs };
+}
+
+/** Ready-made expressions offered by the designer's text editor (inserted inside `{{ }}`). */
+export const EXPRESSION_SNIPPETS: readonly string[] = [
+  'sum(rows, r => r.total)',
+  'avg(rows, r => r.total)',
+  'count(rows)',
+  'min(rows, r => r.total)',
+  'max(rows, r => r.total)',
+  'round(value, 2)',
+  'formatNumber(value, 2)',
+  "formatCurrency(value, 'USD')",
+  "formatDate(today(), 'yyyy-MM-dd')",
+  "iif(condition, 'yes', 'no')",
+  "coalesce(value, '')",
+  'upper(text)',
+  'toWords(value)',
+  'page.number',
+  'page.count',
+  'rowNumber',
+];
+
+/** Wraps the selected range of `text` in `before`/`after` (e.g. `<b>`/`</b>`). Returns the new text and selection. */
+export function wrapSelection(
+  text: string,
+  start: number,
+  end: number,
+  before: string,
+  after = '',
+): { text: string; start: number; end: number } {
+  const a = Math.max(0, Math.min(start, end, text.length));
+  const b = Math.min(text.length, Math.max(start, end));
+  const next = text.slice(0, a) + before + text.slice(a, b) + after + text.slice(b);
+  return { text: next, start: a + before.length, end: b + before.length };
+}
+
+/** Font families every report can use without registering a font (the PDF standard fonts). */
+export const STANDARD_FONT_FAMILIES: readonly string[] = ['Helvetica', 'Times', 'Courier'];
+
+/**
+ * Font families offered in the designer's font list: the standard fonts,
+ * the given extra families (e.g. the `family` of every registered PDF font),
+ * and every family already used in the template. Duplicates are removed
+ * (case-insensitive), order is kept.
+ */
+export function fontFamilies(template: ReportTemplate, extra: readonly string[] = []): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (f: string | undefined) => {
+    const name = f?.trim();
+    if (!name || seen.has(name.toLowerCase())) return;
+    seen.add(name.toLowerCase());
+    out.push(name);
+  };
+  STANDARD_FONT_FAMILIES.forEach(add);
+  extra.forEach(add);
+  for (const s of Object.values(template.styles ?? {})) add(s.fontFamily);
+  for (const { band } of walkBands(template)) {
+    for (const c of band.components) {
+      add(c.style?.fontFamily);
+      c.conditions?.forEach((cond) => add(cond.style.fontFamily));
+    }
+  }
+  return out;
 }

@@ -1,0 +1,86 @@
+---
+title: Fonts and other scripts
+description: Use your own fonts, show them in the designer, and embed them in PDFs.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## What you get without doing anything
+
+Templates can use `Helvetica`, `Times` and `Courier` (and common names that map to them, such as `Arial`, `Georgia` and `monospace`). They are the 14 standard PDF fonts: text is measured with their exact metrics, so line breaks on screen and in the PDF match, and they need no files.
+
+They cover Latin text. For other scripts, or to use your brand font, register a font.
+
+## Register a font
+
+A font has three jobs, and each has its own place:
+
+1. **Measuring** text for line breaks: `createFontMeasurer(fonts)` gives the layout engine the font's real metrics.
+2. **Drawing** it in the PDF: `exportPdf(doc, { fonts })` embeds the font (subset).
+3. **Showing** it on screen: the browser needs the font via `@font-face`, as for any web font.
+
+```ts
+import { createFontMeasurer, exportPdf, generateReport } from '@ariana-reports/core';
+
+const fonts = [
+  { family: 'Roboto', data: await (await fetch('/fonts/Roboto-Regular.ttf')).arrayBuffer() },
+  { family: 'Roboto', bold: true, data: await (await fetch('/fonts/Roboto-Bold.ttf')).arrayBuffer() },
+];
+const measurer = await createFontMeasurer(fonts);
+
+const doc = generateReport(template, data, { measurer });
+const pdf = await exportPdf(doc, { fonts });
+```
+
+Then set `"fontFamily": "Roboto"` in a style. The families you register fall back to the closest standard font for variants you did not provide.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    <ReportViewer template={template} data={data} measurer={measurer} pdf={{ fonts }} />
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <ReportViewer :template="template" :data="data" :measurer="measurer" :pdf="{ fonts }" />
+    ```
+  </TabItem>
+</Tabs>
+
+```css title="app.css"
+@font-face {
+  font-family: 'Roboto';
+  src: url('/fonts/Roboto-Regular.ttf');
+}
+```
+
+## The designer's font list
+
+The font drop-down lists the standard fonts, every font already used in the template, the families in `preview.pdf.fonts`, and any extra names you pass with `fonts`:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    <ReportDesigner
+      template={template}
+      fonts={['Vazirmatn', 'Roboto']}
+      preview={{ measurer, pdf: { fonts } }}
+    />
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <ReportDesigner
+      :template="template"
+      :fonts="['Vazirmatn', 'Roboto']"
+      :preview="{ measurer, pdf: { fonts } }"
+    />
+    ```
+  </TabItem>
+</Tabs>
+
+Listing a family only makes it selectable. It still needs the `@font-face` rule to display, and a file in `pdf.fonts` to be embedded.
+
+## Persian, Arabic and other right-to-left text
+
+On screen, text in any script works as soon as the browser has a font for it: this site's Persian demos use the Vazirmatn font. In the PDF, embedded TrueType fonts are drawn glyph by glyph in logical order. Arabic-script text needs **contextual shaping** (letters change shape and join) and **right-to-left reordering**, and the PDF writer does not do either yet, so Persian and Arabic text in PDFs will look disconnected. See [Known limitations](/project/limitations/). Numbers, dates and the whole user interface are fully localized; see [Languages](/guides/languages/).

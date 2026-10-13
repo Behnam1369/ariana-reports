@@ -1,0 +1,74 @@
+---
+title: PDF, Excel and print
+description: Export reports from the viewer or from your own code.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+All three outputs read the same layout document, so what you see is what you get. Libraries for PDF (pdf-lib) and Excel (exceljs) are loaded on first use.
+
+## From the viewer
+
+The toolbar has *Print*, *PDF* and *Excel* buttons. Choose which to show with `exports`, and replace the browser download with `save`:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    <ReportViewer
+      template={template}
+      data={data}
+      exports={{ print: false, excel: true, pdf: true }}
+      pdf={{ title: 'Sales', author: 'Finance' }}
+      excel={{ sheets: 'perPage' }}
+      save={(bytes, fileName, mimeType) => uploadSomewhere(new Blob([bytes], { type: mimeType }), fileName)}
+    />
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <ReportViewer
+      :template="template"
+      :data="data"
+      :exports="{ print: false, excel: true, pdf: true }"
+      :pdf="{ title: 'Sales', author: 'Finance' }"
+      :excel="{ sheets: 'perPage' }"
+      :save="(bytes, fileName, mimeType) => uploadSomewhere(new Blob([bytes], { type: mimeType }), fileName)"
+    />
+    ```
+  </TabItem>
+</Tabs>
+
+## From your own code
+
+```ts
+import { downloadBytes, exportExcel, exportPdf, generateReport } from '@ariana-reports/core';
+
+const doc = generateReport(template, data, { params: { title: 'Q1' } });
+
+const pdf = await exportPdf(doc, { title: 'Sales', author: 'Finance' });   // Uint8Array
+const xlsx = await exportExcel(doc, { sheets: 'single' });                  // Uint8Array
+
+downloadBytes(pdf, 'sales.pdf', 'application/pdf');
+```
+
+The core package also runs in Node, so you can generate PDF and Excel files in a script or on a server. Pass `loadImage` to control how images are fetched there.
+
+## PDF
+
+- Vector text and shapes, with the document language, title and author set.
+- Without custom fonts it uses the 14 standard PDF fonts (Helvetica, Times, Courier), which cover Latin text. Other scripts need an embedded font: see [Fonts](/guides/fonts/). Characters a standard font cannot encode are replaced by `?`.
+- Images: PNG and JPEG, from data URIs or URLs (`fetch`). Pass `loadImage` to control loading, and `onWarning` to hear about images that could not be loaded.
+
+## Excel
+
+- Numbers, currencies, percentages and dates stay **typed cells** with matching number formats, so users can sum and sort them. Dates in a non-Gregorian calendar are exported as text.
+- `sheets: 'single'` (default) flows all pages into one sheet without page headers/footers or repeated headers, so data stays contiguous. `includePageBands: true` keeps the page bands. `sheets: 'perPage'` makes a sheet per page.
+- Lines become cell borders; text with `allowHtml` becomes rich text.
+
+## Print
+
+`controller.print()` (the toolbar's *Print* button) renders every page into a hidden frame sized for the paper, then opens the browser's print dialog. The page itself is not touched.
+
+## Page size
+
+Page size and margins come from the template. The PDF page is exactly the template's page size, and printing sets the same `@page` size, so choose "Margins: none" in the print dialog for exact output.

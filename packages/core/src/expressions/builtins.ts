@@ -298,9 +298,9 @@ export function getBuiltins(locale: string = DEFAULT_LOCALE): Readonly<Record<st
       const n = toNumber(v);
       return n === null ? toDisplayString(v) : formatPercent(n, Number(decimals), locale);
     },
-    formatDate: (v: unknown, pattern: unknown = 'yyyy-MM-dd') => {
+    formatDate: (v: unknown, pattern: unknown = 'yyyy-MM-dd', calendar?: unknown) => {
       const d = toDate(v);
-      return d ? formatDate(d, String(pattern), locale) : toDisplayString(v);
+      return d ? formatDate(d, String(pattern), locale, calendar === undefined || calendar === null ? undefined : String(calendar)) : toDisplayString(v);
     },
     toWords: (v: unknown) => {
       const n = toNumber(v);

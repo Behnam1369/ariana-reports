@@ -1,6 +1,6 @@
 import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ReportDesigner, ReportViewer, type ReportTemplate } from '@ariana-report/react';
+import { ReportDesigner, ReportViewer, type ReportTemplate } from '@ariana-reports/react';
 import { SAMPLES, storageKey, type Sample } from '../../shared/samples';
 
 function loadTemplate(sample: Sample): ReportTemplate {
@@ -10,6 +10,7 @@ function loadTemplate(sample: Sample): ReportTemplate {
 
 function App() {
   const [tab, setTab] = useState<'viewer' | 'designer'>('viewer');
+  const [uiLocale, setUiLocale] = useState('en');
   const [sample, setSample] = useState<Sample>(SAMPLES[0]!);
   const [template, setTemplate] = useState<ReportTemplate>(() => loadTemplate(SAMPLES[0]!));
   // Bumped on reset or report change so the designer starts over.
@@ -36,6 +37,13 @@ function App() {
             ))}
           </select>
         </label>
+        <label>
+          Language{' '}
+          <select value={uiLocale} onChange={(e) => setUiLocale(e.target.value)}>
+            <option value="en">English</option>
+            <option value="fa">فارسی</option>
+          </select>
+        </label>
         <button type="button" aria-pressed={tab === 'viewer'} onClick={() => setTab('viewer')}>
           Viewer
         </button>
@@ -56,12 +64,13 @@ function App() {
       </nav>
       <main style={{ flex: 1, minHeight: 0 }}>
         {tab === 'viewer' ? (
-          <ReportViewer key={sample.id} template={template} data={sample.data} zoomMode="fitWidth" onError={(e) => console.error(e)} />
+          <ReportViewer key={sample.id} template={template} data={sample.data} zoomMode="fitWidth" uiLocale={uiLocale} onError={(e) => console.error(e)} />
         ) : (
           <ReportDesigner
             key={`${sample.id}:${version}`}
             template={template}
             sampleData={sample.data}
+            uiLocale={uiLocale}
             onSave={(t, json) => {
               // A real app would send `json` to its backend.
               localStorage.setItem(storageKey(sample.id), json);

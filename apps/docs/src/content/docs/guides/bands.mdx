@@ -1,0 +1,63 @@
+---
+title: Bands and data regions
+description: How the parts of a banded report are laid out and paginated.
+---
+
+A banded report is a stack of horizontal **bands**. Each band has a height and holds components. Which bands print, how often, and where they break across pages depends on the band's role.
+
+| Band | Printed |
+| --- | --- |
+| `reportHeader` / `reportFooter` | once, at the start / end of the report |
+| `pageHeader` / `pageFooter` | on every page (`printOnFirstPage`, `printOnLastPage` to skip) |
+| `body[]` static band (`"kind": "band"`) | once, in order |
+| data region `header` / `footer` | before / after the rows (`repeatHeaderOnEachPage`) |
+| group `header` / `footer` | when the group value changes |
+| region `detail` | once per row |
+| region `children[]` | nested regions after each row |
+
+## Data regions
+
+A data region repeats its **detail** band for each row of a data source. It can also have a header, a footer, groups, and child regions:
+
+```json
+{
+  "kind": "dataRegion",
+  "id": "orders_region",
+  "dataSource": "orders",
+  "filter": "row.total > 0",
+  "sort": [{ "expression": "row.date", "direction": "desc" }],
+  "repeatHeaderOnEachPage": true,
+  "header": { "id": "head", "height": 7, "components": [] },
+  "detail": { "id": "row", "height": 6.5, "components": [] },
+  "footer": { "id": "foot", "height": 8, "components": [] }
+}
+```
+
+`filter` skips rows where the expression is falsy. `sort` takes one or more rules. Inside the region's bands you can use `row`, `rowNumber` and `rows` (all rows after filter and sort).
+
+## Band options
+
+| Option | Meaning |
+| --- | --- |
+| `height` | Height in template units. |
+| `canGrow` | Grow to fit components that grow (default true). Ignored for page headers and footers. |
+| `canShrink` | Shrink to the bottom of the visible components (default false). |
+| `visible` | Expression; the band is skipped when it is falsy. |
+| `pageBreakBefore` / `pageBreakAfter` | Force a new page. |
+| `style` | `backgroundColor` and `border` only. |
+| `designColor` | Color of the band in the designer. It has no effect on the report. |
+
+## Pagination
+
+- A band never splits across pages. A band that does not fit moves to the next page; a band taller than a page is clipped, with a warning.
+- Page headers and footers take their space on every page first.
+- A region header with `repeatHeaderOnEachPage` repeats at the top of each continuation page.
+- Components with `canGrow` (text) can make their band taller, so long text pushes the following bands down.
+
+## Example
+
+This product catalog repeats its header on every page and shows page numbers in the page footer:
+
+import Demo from '../../../components/Demo.astro';
+
+<Demo name="viewer-basic" example="products" height={520} />

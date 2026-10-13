@@ -12,8 +12,11 @@ import type {
   ReportComponent,
   ReportTemplate,
   StyleProps,
+  TextAlign,
   Unit,
+  VerticalAlign,
 } from '../model/types';
+import { mergeStyles, resolveStyle } from '../layout/style';
 import { resolvePageSize } from '../model/units';
 import { parseTemplate, validateTemplate, type ValidationIssue } from '../model/validate';
 import { findBand, findComponent, walkBands } from '../model/walk';
@@ -32,7 +35,7 @@ import {
   type ResizeHandle,
 } from './geometry';
 import { fieldExpression, inferFields } from './infer';
-import { convertTemplateUnit, designSections, findGroup, findRegion, type DesignSection } from './sections';
+import { convertTemplateUnit, designSections, findGroup, findRegion, type DesignSection, type SectionLabels } from './sections';
 
 export type PageBandSlot = 'reportHeader' | 'pageHeader' | 'pageFooter' | 'reportFooter';
 
@@ -52,6 +55,8 @@ export interface DesignerSettings {
   snapToObjects: boolean;
   /** Snap distance in template units. */
   snapTolerance: number;
+  /** Show the page margins around the bands on the design surface. */
+  showMargins: boolean;
 }
 
 export interface DesignerState {
@@ -90,11 +95,11 @@ export interface KeyInput {
 type Listener = (state: DesignerState) => void;
 
 const DEFAULT_SETTINGS: Record<Unit, DesignerSettings> = {
-  mm: { grid: 2.5, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 1 },
-  cm: { grid: 0.25, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 0.1 },
-  in: { grid: 0.1, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 0.04 },
-  pt: { grid: 6, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 3 },
-  px: { grid: 8, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 4 },
+  mm: { grid: 2.5, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 1, showMargins: true },
+  cm: { grid: 0.25, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 0.1, showMargins: true },
+  in: { grid: 0.1, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 0.04, showMargins: true },
+  pt: { grid: 6, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 3, showMargins: true },
+  px: { grid: 8, showGrid: true, snapToGrid: true, snapToObjects: true, snapTolerance: 4, showMargins: true },
 };
 
 interface Transaction {
@@ -346,6 +351,54 @@ export class DesignerController {
     }
   }
 
+  /**
+   * Rubber-band selection that may cover several bands, e.g. started in the
+   * page margin. Selections are limited to one band, so the band with the most
+   * hits wins (the first one on a tie). `rects` are in each band's coordinates.
+   * With no hits the selection is cleared (unless `additive`).
+   */
+  selectInBands(rects: { bandId: string; rect: Rect }[], additive = false): void {
+    let best: { bandId: string; rect: Rect; hits: number } | null = null;
+    for (const { bandId, rect } of rects) {
+      const band = findBand(this.state.template, bandId)?.band;
+      if (!band) continue;
+      const hits = band.components.filter((c) => intersects(c, rect)).length;
+      if (hits > 0 && (!best || hits > best.hits)) best = { bandId, rect, hits };
+    }
+    if (best) this.selectInRect(best.bandId, best.rect, additive);
+    else if (!additive) this.clearSelection();
+  }
+
+  /** Sets the horizontal text alignment of the selected text components. */
+  setTextAlign(textAlign: TextAlign, ids = this.state.selection.componentIds): void {
+    this.updateComponentStyle({ textAlign }, this.textIds(ids));
+  }
+
+  /** Sets the vertical text alignment of the selected text components. */
+  setVerticalAlign(verticalAlign: VerticalAlign, ids = this.state.selection.componentIds): void {
+    this.updateComponentStyle({ verticalAlign }, this.textIds(ids));
+  }
+
+  /**
+   * Effective content alignment of the selected text components (named style
+   * and inline style applied). A value is null when the components differ or
+   * no text component is selected.
+   */
+  textAlignment(ids = this.state.selection.componentIds): { textAlign: TextAlign | null; verticalAlign: VerticalAlign | null } {
+    const t = this.state.template;
+    const styles = this.textIds(ids).map((id) => {
+      const c = findComponent(t, id)!.component;
+      return resolveStyle(mergeStyles(c.styleName ? t.styles?.[c.styleName] : undefined, c.style), t.unit);
+    });
+    const common = <K extends 'textAlign' | 'verticalAlign'>(key: K) =>
+      styles.length && styles.every((s) => s[key] === styles[0]![key]) ? styles[0]![key] : null;
+    return { textAlign: common('textAlign'), verticalAlign: common('verticalAlign') };
+  }
+
+  private textIds(ids: string[]): string[] {
+    return ids.filter((id) => findComponent(this.state.template, id)?.component.type === 'text');
+  }
+
   /** Selected components, in selection order. */
   selectedComponents(): ReportComponent[] {
     const t = this.state.template;
@@ -354,8 +407,15 @@ export class DesignerController {
 
   // -- design surface helpers ---------------------------------------------------
 
-  sections(): DesignSection[] {
-    return designSections(this.state.template);
+  /** Bands in design order. Pass translated labels for localized captions. */
+  sections(labels?: SectionLabels): DesignSection[] {
+    return designSections(this.state.template, labels);
+  }
+
+  /** Page size in template units, with the orientation applied. */
+  pageSize(): { width: number; height: number } {
+    const t = this.state.template;
+    return resolvePageSize(t.page, t.unit);
   }
 
   /** Width of the printable body in template units: components should stay within it. */
@@ -674,41 +734,89 @@ export class DesignerController {
    */
   moveComponents(ids: string[], dx: number, dy: number, snap = true): void {
     if (ids.length === 0) return;
-    const { settings } = this.state;
     let guides: Guide[] = [];
     let bandId: string | null = null;
     this.commit('Move', (t) => {
       const found = ids.map((id) => findComponent(t, id)).filter((f): f is NonNullable<typeof f> => !!f);
       if (found.length === 0) return;
-      const primary = found[0]!;
-      bandId = primary.band.band.id;
-      let ox = dx;
-      let oy = dy;
-      // Keep the whole group inside the band's left/top edges.
-      const minX = Math.min(...found.map((f) => f.component.x));
-      const minY = Math.min(...found.map((f) => f.component.y));
-      ox = Math.max(ox, -minX);
-      oy = Math.max(oy, -minY);
-      if (snap && (settings.snapToGrid || settings.snapToObjects)) {
-        const moving = new Set(ids);
-        const others = primary.band.band.components.filter((c) => !moving.has(c.id));
-        const bounds = { x: 0, y: 0, width: this.bodyWidth(), height: primary.band.band.height };
-        const target = { ...primary.component, x: primary.component.x + ox, y: primary.component.y + oy };
-        const snapped = snapMove(target, settings.snapToObjects ? others : [], bounds, {
-          grid: settings.snapToGrid ? settings.grid : 0,
-          tolerance: settings.snapToObjects ? settings.snapTolerance : 0,
-        });
-        guides = snapped.guides;
-        ox = Math.max(snapped.rect.x - primary.component.x, -minX);
-        oy = Math.max(snapped.rect.y - primary.component.y, -minY);
-      }
-      for (const f of found) {
-        f.component.x = round(f.component.x + ox);
-        f.component.y = round(f.component.y + oy);
-        growBandToFit(f.band.band, f.component);
-      }
+      const band = found[0]!.band.band;
+      bandId = band.id;
+      const comps = found.map((f) => f.component);
+      guides = this.offsetComponents(comps, band, dx, dy, snap);
+      for (const f of found) growBandToFit(f.band.band, f.component);
     });
     this.emit({ guides: bandId && guides.length ? { bandId, guides } : null });
+  }
+
+  /**
+   * Moves components by a delta inside `band` (which must already contain
+   * them), snapping the first one and keeping the group inside the band's
+   * left/top edges. Returns the snap guides.
+   */
+  private offsetComponents(comps: ReportComponent[], band: Band, dx: number, dy: number, snap: boolean): Guide[] {
+    const { settings } = this.state;
+    const primary = comps[0]!;
+    const minX = Math.min(...comps.map((c) => c.x));
+    const minY = Math.min(...comps.map((c) => c.y));
+    let ox = Math.max(dx, -minX);
+    let oy = Math.max(dy, -minY);
+    let guides: Guide[] = [];
+    if (snap && (settings.snapToGrid || settings.snapToObjects)) {
+      const moving = new Set(comps.map((c) => c.id));
+      const others = band.components.filter((c) => !moving.has(c.id));
+      const bounds = { x: 0, y: 0, width: this.bodyWidth(), height: band.height };
+      const target = { ...primary, x: primary.x + ox, y: primary.y + oy };
+      const snapped = snapMove(target, settings.snapToObjects ? others : [], bounds, {
+        grid: settings.snapToGrid ? settings.grid : 0,
+        tolerance: settings.snapToObjects ? settings.snapTolerance : 0,
+      });
+      guides = snapped.guides;
+      ox = Math.max(snapped.rect.x - primary.x, -minX);
+      oy = Math.max(snapped.rect.y - primary.y, -minY);
+    }
+    for (const c of comps) {
+      c.x = round(c.x + ox);
+      c.y = round(c.y + oy);
+    }
+    return guides;
+  }
+
+  /**
+   * Moves components (all from one band) into another band while dragging.
+   * `dx`/`dy` are measured from the components' original positions, in the
+   * target band's coordinates: when the target band starts 30 units below the
+   * source band, a pointer movement of 35 units down is `dy = 5`. Inside an
+   * interaction the change is applied to the drag start state, so the drag can
+   * move back and forth between bands. Moving to the components' own band is
+   * the same as `moveComponents`.
+   */
+  moveComponentsToBand(ids: string[], bandId: string, dx: number, dy: number, snap = true): void {
+    if (ids.length === 0) return;
+    const base = this.transaction ? this.transaction.base : this.state.template;
+    const first = findComponent(base, ids[0]!);
+    if (!first || !findBand(base, bandId)) return;
+    if (first.band.band.id === bandId) {
+      this.moveComponents(ids, dx, dy, snap);
+      return;
+    }
+    let guides: Guide[] = [];
+    this.commit('Move to band', (t) => {
+      const target = findBand(t, bandId)!.band;
+      const moving = new Set(ids);
+      const comps: ReportComponent[] = [];
+      for (const id of ids) {
+        const f = findComponent(t, id);
+        if (!f || f.band.band === target) continue;
+        f.band.band.components = f.band.band.components.filter((c) => c.id !== id);
+        comps.push(f.component);
+      }
+      if (comps.length === 0) return undefined;
+      target.components = [...target.components.filter((c) => !moving.has(c.id)), ...comps];
+      guides = this.offsetComponents(comps, target, dx, dy, snap);
+      for (const c of comps) growBandToFit(target, c);
+      return { componentIds: comps.map((c) => c.id), bandId };
+    });
+    this.emit({ guides: guides.length ? { bandId, guides } : null });
   }
 
   /** Moves the selection by a small step (arrow keys). Uses the grid unless `fine` is true. */
@@ -740,19 +848,31 @@ export class DesignerController {
 
   /** Resizes a component with a handle; inside an interaction the delta is measured from the drag start. */
   resizeComponent(id: string, handle: ResizeHandle, dx: number, dy: number): void {
+    this.resizeComponents([id], handle, dx, dy);
+  }
+
+  /**
+   * Resizes several components with the same handle and delta, e.g. to make
+   * every cell of a table row taller at once. Each component keeps its own
+   * opposite edge fixed.
+   */
+  resizeComponents(ids: string[], handle: ResizeHandle, dx: number, dy: number): void {
+    if (ids.length === 0) return;
     const grid = this.state.settings.snapToGrid ? this.state.settings.grid : 0;
     this.commit('Resize', (t) => {
-      const found = findComponent(t, id);
-      if (!found) return;
-      const c = found.component;
-      const isHLine = c.type === 'line' && c.orientation === 'horizontal';
-      const isVLine = c.type === 'line' && c.orientation === 'vertical';
-      const next = resizeRect(c, handle, isVLine ? 0 : dx, isHLine ? 0 : dy, grid, isHLine || isVLine ? 0 : this.fineStep());
-      c.x = next.x;
-      c.y = next.y;
-      c.width = isVLine ? 0 : next.width;
-      c.height = isHLine ? 0 : next.height;
-      growBandToFit(found.band.band, c);
+      for (const id of ids) {
+        const found = findComponent(t, id);
+        if (!found) continue;
+        const c = found.component;
+        const isHLine = c.type === 'line' && c.orientation === 'horizontal';
+        const isVLine = c.type === 'line' && c.orientation === 'vertical';
+        const next = resizeRect(c, handle, isVLine ? 0 : dx, isHLine ? 0 : dy, grid, isHLine || isVLine ? 0 : this.fineStep());
+        c.x = next.x;
+        c.y = next.y;
+        c.width = isVLine ? 0 : next.width;
+        c.height = isHLine ? 0 : next.height;
+        growBandToFit(found.band.band, c);
+      }
     });
   }
 

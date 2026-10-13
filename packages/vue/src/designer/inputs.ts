@@ -1,5 +1,15 @@
-import { defineComponent, h, ref, useId, watch, type PropType, type VNode } from 'vue';
-import { checkExpression, compileText } from '@ariana-report/core';
+import { defineComponent, h, inject, ref, useId, watch, type PropType, type VNode } from 'vue';
+import { checkExpression, compileText, optionLabel } from '@ariana-reports/core';
+import { DESIGNER_KEY } from './context';
+import { icon } from '../Icon';
+
+/** Collapsible panel section. */
+export function panelSection(title: string, children: (VNode | null)[], open = true): VNode {
+  return h('details', { class: 'ar-section', open }, [
+    h('summary', [icon('chevron'), h('span', title)]),
+    h('div', { class: 'ar-section-body' }, children),
+  ]);
+}
 
 export const validateExpression = (src: string): string | null => checkExpression(src);
 export const validateText = (src: string): string | null => {
@@ -146,10 +156,14 @@ export const SelectInput = defineComponent({
     options: { type: Array as PropType<readonly Option[]>, required: true },
     allowEmpty: String,
     ariaLabel: String,
+    /** Show string options through the UI locale's value translations (for enum values such as "bold"). */
+    translate: Boolean,
   },
   emits: { change: (_v: string | undefined) => true },
   setup(props, { emit }) {
+    const ctx = inject(DESIGNER_KEY, null);
     return () => {
+      const values = props.translate ? ctx?.values.value : undefined;
       const current = props.value ?? '';
       return h(
         'select',
@@ -166,7 +180,7 @@ export const SelectInput = defineComponent({
         [
           props.allowEmpty !== undefined ? h('option', { value: '', selected: current === '' }, props.allowEmpty) : null,
           ...props.options.map((o) => {
-            const opt = typeof o === 'string' ? { value: o, label: o } : o;
+            const opt = typeof o === 'string' ? { value: o, label: values ? optionLabel(values, o) : o } : o;
             return h('option', { key: opt.value, value: opt.value, selected: opt.value === current }, opt.label);
           }),
         ],
@@ -197,10 +211,12 @@ export const ColorInput = defineComponent({
   props: { id: String, value: { type: String as PropType<string | undefined> }, ariaLabel: String },
   emits: { change: (_v: string | undefined) => true },
   setup(props, { emit }) {
+    const ctx = inject(DESIGNER_KEY, null);
     return () => {
       const v = props.value;
+      const labels = ctx?.labels.value;
       const full = v && /^#[0-9a-f]{3}$/i.test(v) ? `#${[...v.slice(1)].map((c) => c + c).join('')}` : v;
-      return h('div', { class: 'ar-field-row' }, [
+      return h('div', { class: 'ar-color' }, [
         h('input', {
           id: props.id,
           type: 'color',
@@ -209,9 +225,19 @@ export const ColorInput = defineComponent({
           value: full && HEX6.test(full) ? full : '#000000',
           onInput: (e: Event) => emit('change', (e.target as HTMLInputElement).value),
         }),
-        h('span', { class: 'ar-hint' }, v ?? 'none'),
+        h('span', { class: 'ar-hint' }, v ?? labels?.noColor ?? 'none'),
         v !== undefined
-          ? h('button', { type: 'button', class: 'ar-btn', 'aria-label': `Clear ${props.ariaLabel ?? 'color'}`, onClick: () => emit('change', undefined) }, '×')
+          ? h(
+              'button',
+              {
+                type: 'button',
+                class: 'ar-btn ar-btn-icon ar-btn-sm',
+                'aria-label': `${labels?.clear ?? 'Clear'} ${props.ariaLabel ?? 'color'}`,
+                title: labels?.clear ?? 'Clear',
+                onClick: () => emit('change', undefined),
+              },
+              [icon('close')],
+            )
           : null,
       ]);
     };

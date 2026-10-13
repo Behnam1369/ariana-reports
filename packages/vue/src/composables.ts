@@ -6,7 +6,7 @@ import {
   type DesignerState,
   type ViewerControllerOptions,
   type ViewerState,
-} from '@ariana-report/core';
+} from '@ariana-reports/core';
 
 interface Store<S> {
   subscribe(listener: (state: S) => void): () => void;

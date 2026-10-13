@@ -2,6 +2,7 @@ import type { Band, DataRegion, Group, ReportTemplate } from '../model/types';
 import { convertUnit } from '../model/units';
 import type { Unit } from '../model/types';
 import type { BandRole } from '../model/walk';
+import { DEFAULT_LABELS, formatLabel, type Labels } from '../ui/labels';
 
 /** A band as shown on the design surface, top to bottom. */
 export interface DesignSection {
@@ -18,39 +19,52 @@ export interface DesignSection {
   dataContext?: string;
 }
 
-const PAGE_LABELS: Record<string, string> = {
-  reportHeader: 'Report header',
-  pageHeader: 'Page header',
-  pageFooter: 'Page footer',
-  reportFooter: 'Report footer',
-};
+/** Caption templates used by `designSections`; a subset of the UI labels. */
+export type SectionLabels = Pick<
+  Labels,
+  | 'reportHeader'
+  | 'pageHeader'
+  | 'pageFooter'
+  | 'reportFooter'
+  | 'sectionBand'
+  | 'sectionHeader'
+  | 'sectionGroupHeader'
+  | 'sectionDetail'
+  | 'sectionGroupFooter'
+  | 'sectionFooter'
+>;
 
-function regionSections(region: DataRegion, depth: number, out: DesignSection[]): void {
+function regionSections(region: DataRegion, depth: number, out: DesignSection[], l: SectionLabels): void {
   const source = region.dataSource ?? (region.relation ? `parent.${region.relation}` : '');
   const base = { region, depth, dataContext: source };
-  if (region.header) out.push({ ...base, band: region.header, role: 'regionHeader', label: `Header: ${source}` });
+  if (region.header) out.push({ ...base, band: region.header, role: 'regionHeader', label: formatLabel(l.sectionHeader, { source }) });
   for (const group of region.groups ?? []) {
-    if (group.header) out.push({ ...base, band: group.header, role: 'groupHeader', group, label: `Group header: ${group.expression}` });
+    if (group.header) {
+      out.push({ ...base, band: group.header, role: 'groupHeader', group, label: formatLabel(l.sectionGroupHeader, { expression: group.expression }) });
+    }
   }
-  out.push({ ...base, band: region.detail, role: 'detail', label: `Detail: ${source}` });
-  for (const child of region.children ?? []) regionSections(child, depth + 1, out);
+  out.push({ ...base, band: region.detail, role: 'detail', label: formatLabel(l.sectionDetail, { source }) });
+  for (const child of region.children ?? []) regionSections(child, depth + 1, out, l);
   for (const group of [...(region.groups ?? [])].reverse()) {
-    if (group.footer) out.push({ ...base, band: group.footer, role: 'groupFooter', group, label: `Group footer: ${group.expression}` });
+    if (group.footer) {
+      out.push({ ...base, band: group.footer, role: 'groupFooter', group, label: formatLabel(l.sectionGroupFooter, { expression: group.expression }) });
+    }
   }
-  if (region.footer) out.push({ ...base, band: region.footer, role: 'regionFooter', label: `Footer: ${source}` });
+  if (region.footer) out.push({ ...base, band: region.footer, role: 'regionFooter', label: formatLabel(l.sectionFooter, { source }) });
 }
 
 /** Lists every band of a template in design order with captions for the design surface. */
-export function designSections(template: ReportTemplate): DesignSection[] {
+export function designSections(template: ReportTemplate, labels: SectionLabels = DEFAULT_LABELS): DesignSection[] {
+  const l = labels;
   const out: DesignSection[] = [];
-  if (template.reportHeader) out.push({ band: template.reportHeader, role: 'reportHeader', label: PAGE_LABELS.reportHeader!, depth: 0 });
-  if (template.pageHeader) out.push({ band: template.pageHeader, role: 'pageHeader', label: PAGE_LABELS.pageHeader!, depth: 0 });
+  if (template.reportHeader) out.push({ band: template.reportHeader, role: 'reportHeader', label: l.reportHeader, depth: 0 });
+  if (template.pageHeader) out.push({ band: template.pageHeader, role: 'pageHeader', label: l.pageHeader, depth: 0 });
   template.body.forEach((item, i) => {
-    if (item.kind === 'band') out.push({ band: item, role: 'static', label: `Band ${i + 1}`, depth: 0 });
-    else regionSections(item, 0, out);
+    if (item.kind === 'band') out.push({ band: item, role: 'static', label: formatLabel(l.sectionBand, { n: i + 1 }), depth: 0 });
+    else regionSections(item, 0, out, l);
   });
-  if (template.pageFooter) out.push({ band: template.pageFooter, role: 'pageFooter', label: PAGE_LABELS.pageFooter!, depth: 0 });
-  if (template.reportFooter) out.push({ band: template.reportFooter, role: 'reportFooter', label: PAGE_LABELS.reportFooter!, depth: 0 });
+  if (template.pageFooter) out.push({ band: template.pageFooter, role: 'pageFooter', label: l.pageFooter, depth: 0 });
+  if (template.reportFooter) out.push({ band: template.reportFooter, role: 'reportFooter', label: l.reportFooter, depth: 0 });
   return out;
 }
 

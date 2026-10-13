@@ -1,8 +1,10 @@
 import { useId, useState } from 'react';
 import {
   BORDER_LINE_STYLES,
+  CALENDARS,
   findBand,
   findRegion,
+  formatLabel,
   FONT_STYLES,
   FONT_WEIGHTS,
   IMAGE_FITS,
@@ -21,21 +23,12 @@ import {
   type ReportComponent,
   type StyleProps,
   type ValueFormat,
-} from '@ariana-report/core';
+} from '@ariana-reports/core';
 import { useDesignerContext } from './context';
-import { CheckInput, ColorInput, Field, NumberInput, SelectInput, TextInput, validateExpression, validateText } from './inputs';
+import { CheckInput, ColorInput, Field, NumberInput, Section, SelectInput, TextInput, validateExpression, validateText } from './inputs';
+import { Icon } from '../Icon';
 
-const FONT_FAMILIES = ['Helvetica', 'Times', 'Courier'];
-const PAGE_BAND_LABELS = { reportHeader: 'Report header', pageHeader: 'Page header', pageFooter: 'Page footer', reportFooter: 'Report footer' } as const;
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="ar-panel-section">
-      <h3 className="ar-panel-title">{title}</h3>
-      {children}
-    </div>
-  );
-}
 
 function Completions({ id, bandId }: { id: string; bandId?: string }) {
   const { controller } = useDesignerContext();
@@ -64,7 +57,7 @@ function ExpressionField({ label, value, onCommit, bandId, placeholder }: { labe
 }
 
 function StyleEditor({ style, onChange, textProps = true }: { style: StyleProps; onChange: (patch: Partial<Record<keyof StyleProps, unknown>>) => void; textProps?: boolean }) {
-  const { labels } = useDesignerContext();
+  const { labels, values, fonts } = useDesignerContext();
   const border = style.border;
   const setBorder = (patch: Partial<BorderSpec> | null) => {
     if (patch === null) return onChange({ border: undefined });
@@ -75,47 +68,47 @@ function StyleEditor({ style, onChange, textProps = true }: { style: StyleProps;
     <>
       {textProps && (
         <>
-          <Field label="Font">
+          <Field label={labels.font}>
             {(id) => (
               <SelectInput
                 id={id}
                 value={style.fontFamily}
-                options={[...new Set([...FONT_FAMILIES, ...(style.fontFamily ? [style.fontFamily] : [])])]}
-                allowEmpty="(default)"
+                options={[...new Set([...fonts, ...(style.fontFamily ? [style.fontFamily] : [])])]}
+                allowEmpty={labels.defaultOption}
                 onChange={(fontFamily) => onChange({ fontFamily })}
               />
             )}
           </Field>
-          <Field label="Size (pt)">{(id) => <NumberInput id={id} optional min={1} value={style.fontSize} onCommit={(fontSize) => onChange({ fontSize })} />}</Field>
-          <Field label="Weight">{(id) => <SelectInput id={id} value={style.fontWeight} options={FONT_WEIGHTS} allowEmpty="(default)" onChange={(fontWeight) => onChange({ fontWeight })} />}</Field>
-          <Field label="Style">{(id) => <SelectInput id={id} value={style.fontStyle} options={FONT_STYLES} allowEmpty="(default)" onChange={(fontStyle) => onChange({ fontStyle })} />}</Field>
-          <Field label="Decoration">
-            {(id) => <SelectInput id={id} value={style.textDecoration} options={TEXT_DECORATIONS} allowEmpty="(default)" onChange={(textDecoration) => onChange({ textDecoration })} />}
+          <Field label={labels.fontSize}>{(id) => <NumberInput id={id} optional min={1} value={style.fontSize} onCommit={(fontSize) => onChange({ fontSize })} />}</Field>
+          <Field label={labels.fontWeight}>{(id) => <SelectInput id={id} value={style.fontWeight} options={FONT_WEIGHTS} translate allowEmpty={labels.defaultOption} onChange={(fontWeight) => onChange({ fontWeight })} />}</Field>
+          <Field label={labels.fontStyle}>{(id) => <SelectInput id={id} value={style.fontStyle} options={FONT_STYLES} translate allowEmpty={labels.defaultOption} onChange={(fontStyle) => onChange({ fontStyle })} />}</Field>
+          <Field label={labels.textDecoration}>
+            {(id) => <SelectInput id={id} value={style.textDecoration} options={TEXT_DECORATIONS} translate allowEmpty={labels.defaultOption} onChange={(textDecoration) => onChange({ textDecoration })} />}
           </Field>
-          <Field label="Color">{(id) => <ColorInput id={id} ariaLabel="Text color" value={style.color} onChange={(color) => onChange({ color })} />}</Field>
+          <Field label={labels.color}>{(id) => <ColorInput id={id} ariaLabel={labels.textColor} value={style.color} onChange={(color) => onChange({ color })} />}</Field>
           <Field label={labels.align}>
-            {(id) => <SelectInput id={id} value={style.textAlign} options={TEXT_ALIGNS} allowEmpty="(default)" onChange={(textAlign) => onChange({ textAlign })} />}
+            {(id) => <SelectInput id={id} value={style.textAlign} options={TEXT_ALIGNS} translate allowEmpty={labels.defaultOption} onChange={(textAlign) => onChange({ textAlign })} />}
           </Field>
-          <Field label="Vertical">
-            {(id) => <SelectInput id={id} value={style.verticalAlign} options={VERTICAL_ALIGNS} allowEmpty="(default)" onChange={(verticalAlign) => onChange({ verticalAlign })} />}
+          <Field label={labels.verticalAlign}>
+            {(id) => <SelectInput id={id} value={style.verticalAlign} options={VERTICAL_ALIGNS} translate allowEmpty={labels.defaultOption} onChange={(verticalAlign) => onChange({ verticalAlign })} />}
           </Field>
-          <Field label="Padding">{(id) => <NumberInput id={id} optional min={0} value={padding} onCommit={(p) => onChange({ padding: p })} />}</Field>
+          <Field label={labels.padding}>{(id) => <NumberInput id={id} optional min={0} value={padding} onCommit={(p) => onChange({ padding: p })} />}</Field>
         </>
       )}
-      <Field label="Background">{(id) => <ColorInput id={id} ariaLabel="Background color" value={style.backgroundColor} onChange={(backgroundColor) => onChange({ backgroundColor })} />}</Field>
-      <CheckInput label="Border" checked={!!border} onChange={(on) => setBorder(on ? {} : null)} />
+      <Field label={labels.background}>{(id) => <ColorInput id={id} ariaLabel={labels.backgroundColor} value={style.backgroundColor} onChange={(backgroundColor) => onChange({ backgroundColor })} />}</Field>
+      <CheckInput label={labels.border} checked={!!border} onChange={(on) => setBorder(on ? {} : null)} />
       {border && (
         <>
-          <Field label="Border width">{(id) => <NumberInput id={id} min={0} value={border.width} onCommit={(width) => setBorder({ width: width ?? 0 })} />}</Field>
-          <Field label="Border color">{(id) => <ColorInput id={id} ariaLabel="Border color" value={border.color} onChange={(color) => setBorder({ color: color ?? '#000000' })} />}</Field>
-          <Field label="Border style">{(id) => <SelectInput id={id} value={border.style} options={BORDER_LINE_STYLES} onChange={(s) => s && setBorder({ style: s })} />}</Field>
-          <div className="ar-field-row" role="group" aria-label="Border sides">
+          <Field label={labels.borderWidth}>{(id) => <NumberInput id={id} min={0} value={border.width} onCommit={(width) => setBorder({ width: width ?? 0 })} />}</Field>
+          <Field label={labels.borderColor}>{(id) => <ColorInput id={id} ariaLabel={labels.borderColor} value={border.color} onChange={(color) => setBorder({ color: color ?? '#000000' })} />}</Field>
+          <Field label={labels.borderStyle}>{(id) => <SelectInput id={id} value={border.style} options={BORDER_LINE_STYLES} translate onChange={(s) => s && setBorder({ style: s })} />}</Field>
+          <div className="ar-field-row" role="group" aria-label={labels.borderSides}>
             {(['top', 'right', 'bottom', 'left'] as const).map((side) => {
               const sides = border.sides ?? ['top', 'right', 'bottom', 'left'];
               return (
                 <CheckInput
                   key={side}
-                  label={side}
+                  label={values[side] ?? side}
                   checked={sides.includes(side)}
                   onChange={(on) => {
                     const next = on ? [...sides, side] : sides.filter((s) => s !== side);
@@ -132,16 +125,18 @@ function StyleEditor({ style, onChange, textProps = true }: { style: StyleProps;
 }
 
 function FormatEditor({ format, onChange }: { format: ValueFormat | undefined; onChange: (f: ValueFormat | undefined) => void }) {
+  const { labels } = useDesignerContext();
   const type = format?.type;
   return (
     <>
-      <Field label="Format">
+      <Field label={labels.format}>
         {(id) => (
           <SelectInput
             id={id}
             value={type}
             options={['number', 'currency', 'percent', 'date'] as const}
-            allowEmpty="(none)"
+            translate
+            allowEmpty={labels.noneOption}
             onChange={(t) => {
               if (!t) return onChange(undefined);
               if (t === 'number') onChange({ type: 'number', decimals: 2, thousandsSeparator: true });
@@ -153,27 +148,40 @@ function FormatEditor({ format, onChange }: { format: ValueFormat | undefined; o
         )}
       </Field>
       {format && format.type !== 'date' && (
-        <Field label="Decimals">
+        <Field label={labels.decimals}>
           {(id) => <NumberInput id={id} optional min={0} step={1} value={format.decimals} onCommit={(decimals) => onChange({ ...format, decimals } as ValueFormat)} />}
         </Field>
       )}
       {format?.type === 'currency' && (
-        <Field label="Currency">
-          {(id) => <TextInput id={id} value={format.currency} validate={(v) => (/^[A-Z]{3}$/.test(v) ? null : 'Use a 3-letter code such as USD')} onCommit={(currency) => onChange({ ...format, currency })} />}
+        <Field label={labels.currency}>
+          {(id) => <TextInput id={id} value={format.currency} validate={(v) => (/^[A-Z]{3}$/.test(v) ? null : labels.currencyHint)} onCommit={(currency) => onChange({ ...format, currency })} />}
         </Field>
       )}
       {format?.type === 'number' && (
-        <CheckInput label="Thousands separator" checked={format.thousandsSeparator !== false} onChange={(thousandsSeparator) => onChange({ ...format, thousandsSeparator })} />
+        <CheckInput label={labels.thousandsSeparator} checked={format.thousandsSeparator !== false} onChange={(thousandsSeparator) => onChange({ ...format, thousandsSeparator })} />
       )}
       {format?.type === 'date' && (
-        <Field label="Pattern">{(id) => <TextInput id={id} value={format.pattern} onCommit={(pattern) => pattern && onChange({ ...format, pattern })} />}</Field>
+        <>
+          <Field label={labels.pattern}>{(id) => <TextInput id={id} value={format.pattern} onCommit={(pattern) => pattern && onChange({ ...format, pattern })} />}</Field>
+          <Field label={labels.calendar}>
+            {(id) => (
+              <SelectInput
+                id={id}
+                value={format.calendar ?? 'gregory'}
+                options={CALENDARS}
+                translate
+                onChange={(calendar) => onChange({ ...format, calendar: calendar === 'gregory' ? undefined : calendar })}
+              />
+            )}
+          </Field>
+        </>
       )}
     </>
   );
 }
 
 function ComponentProperties({ component, bandId }: { component: ReportComponent; bandId: string }) {
-  const { controller, state, labels } = useDesignerContext();
+  const { controller, state, labels, values, openTextEditor } = useDesignerContext();
   const update = (patch: Partial<ReportComponent>) => controller.updateComponent(component.id, patch);
   const unit = state.template.unit;
   const styles = Object.keys(state.template.styles ?? {});
@@ -182,47 +190,55 @@ function ComponentProperties({ component, bandId }: { component: ReportComponent
   return (
     <>
       <Section title={`${labels[component.type]} (${component.id})`}>
-        <Field label="Name">{(id) => <TextInput id={id} value={component.name ?? ''} onCommit={(name) => update({ name: name || undefined })} />}</Field>
-        <div className="ar-field-grid" role="group" aria-label={`Position and size (${unit})`}>
+        <Field label={labels.name}>{(id) => <TextInput id={id} value={component.name ?? ''} onCommit={(name) => update({ name: name || undefined })} />}</Field>
+        <div className="ar-field-grid" role="group" aria-label={`${labels.positionAndSize} (${unit})`}>
           {(['x', 'y', 'width', 'height'] as const).map((k) => (
             <label key={k} className="ar-hint">
-              {k} ({unit})
-              <NumberInput min={0} value={component[k]} onCommit={(v) => update({ [k]: v ?? 0 })} ariaLabel={`${k} (${unit})`} />
+              {values[k] ?? k} ({unit})
+              <NumberInput min={0} value={component[k]} onCommit={(v) => update({ [k]: v ?? 0 })} ariaLabel={`${values[k] ?? k} (${unit})`} />
             </label>
           ))}
         </div>
-        <CheckInput label="Stretch to band height" checked={!!component.growToHeight} onChange={(on) => update({ growToHeight: on || undefined })} />
+        <CheckInput label={labels.growToHeight} checked={!!component.growToHeight} onChange={(on) => update({ growToHeight: on || undefined })} />
       </Section>
       {component.type === 'text' && (
-        <Section title="Content">
-          <Field label="Text" full>
+        <Section title={labels.content}>
+          <Field label={labels.textField} full>
             {(id) => (
               <>
-                <TextInput id={id} multiline value={component.text} validate={validateText} onCommit={(text) => update({ text } as Partial<ReportComponent>)} />
+                <div className="ar-field-control">
+                  <TextInput id={id} multiline value={component.text} validate={validateText} onCommit={(text) => update({ text } as Partial<ReportComponent>)} />
+                  <button type="button" className="ar-btn ar-btn-icon ar-btn-sm ar-btn-outline" aria-label={labels.openTextEditor} title={labels.openTextEditor} onClick={() => openTextEditor(component.id)}>
+                    <Icon name="expand" />
+                  </button>
+                </div>
                 <Completions id={textListId} bandId={bandId} />
               </>
             )}
           </Field>
-          <p className="ar-hint">{'Use {{ expression }} for data, e.g. {{ row.total }} or {{ sum(rows, r => r.total) }}.'}</p>
+          <p className="ar-hint">{labels.textHint}</p>
           <FormatEditor format={component.format} onChange={(format) => update({ format } as Partial<ReportComponent>)} />
-          <CheckInput label="Grow to fit text" checked={!!component.canGrow} onChange={(canGrow) => update({ canGrow: canGrow || undefined } as Partial<ReportComponent>)} />
-          <CheckInput label="Word wrap" checked={component.wordWrap !== false} onChange={(w) => update({ wordWrap: w ? undefined : false } as Partial<ReportComponent>)} />
+          <CheckInput label={labels.canGrowText} checked={!!component.canGrow} onChange={(canGrow) => update({ canGrow: canGrow || undefined } as Partial<ReportComponent>)} />
+          <CheckInput label={labels.wordWrap} checked={component.wordWrap !== false} onChange={(w) => update({ wordWrap: w ? undefined : false } as Partial<ReportComponent>)} />
+          <CheckInput label={labels.allowHtml} checked={!!component.allowHtml} onChange={(on) => update({ allowHtml: on || undefined } as Partial<ReportComponent>)} />
+          {component.allowHtml && <p className="ar-hint">{labels.allowHtmlHint}</p>}
         </Section>
       )}
       {component.type === 'image' && (
-        <Section title="Image">
-          <Field label="Source">{(id) => <TextInput id={id} value={component.src} validate={validateText} placeholder="https://… or data:image/png;base64,…" onCommit={(src) => update({ src } as Partial<ReportComponent>)} />}</Field>
-          <Field label="Fit">{(id) => <SelectInput id={id} value={component.fit ?? 'contain'} options={IMAGE_FITS} onChange={(fit) => update({ fit } as Partial<ReportComponent>)} />}</Field>
+        <Section title={labels.image}>
+          <Field label={labels.source}>{(id) => <TextInput id={id} value={component.src} validate={validateText} placeholder={labels.imageSourcePlaceholder} onCommit={(src) => update({ src } as Partial<ReportComponent>)} />}</Field>
+          <Field label={labels.fit}>{(id) => <SelectInput id={id} value={component.fit ?? 'contain'} options={IMAGE_FITS} translate onChange={(fit) => update({ fit } as Partial<ReportComponent>)} />}</Field>
         </Section>
       )}
       {component.type === 'line' && (
-        <Section title="Line">
-          <Field label="Orientation">
+        <Section title={labels.line}>
+          <Field label={labels.orientation}>
             {(id) => (
               <SelectInput
                 id={id}
                 value={component.orientation}
                 options={LINE_ORIENTATIONS}
+                translate
                 onChange={(orientation) => {
                   if (!orientation || orientation === component.orientation) return;
                   const length = component.orientation === 'horizontal' ? component.width : component.height;
@@ -231,17 +247,17 @@ function ComponentProperties({ component, bandId }: { component: ReportComponent
               />
             )}
           </Field>
-          <p className="ar-hint">Line width, color and style come from the border settings below.</p>
+          <p className="ar-hint">{labels.lineHint}</p>
         </Section>
       )}
       {component.type === 'rectangle' && (
-        <Section title="Rectangle">
-          <Field label={`Radius (${unit})`}>{(id) => <NumberInput id={id} optional min={0} value={component.cornerRadius} onCommit={(cornerRadius) => update({ cornerRadius } as Partial<ReportComponent>)} />}</Field>
+        <Section title={labels.rectangle}>
+          <Field label={`${labels.radius} (${unit})`}>{(id) => <NumberInput id={id} optional min={0} value={component.cornerRadius} onCommit={(cornerRadius) => update({ cornerRadius } as Partial<ReportComponent>)} />}</Field>
         </Section>
       )}
-      <Section title="Style">
-        <Field label="Named style">
-          {(id) => <SelectInput id={id} value={component.styleName} options={styles} allowEmpty="(none)" onChange={(name) => update({ styleName: name })} />}
+      <Section title={labels.styleSection}>
+        <Field label={labels.namedStyle}>
+          {(id) => <SelectInput id={id} value={component.styleName} options={styles} allowEmpty={labels.noneOption} onChange={(name) => update({ styleName: name })} />}
         </Field>
         <StyleEditor style={component.style ?? {}} textProps={component.type === 'text'} onChange={(patch) => controller.updateComponentStyle(patch, [component.id])} />
         <form
@@ -255,19 +271,19 @@ function ComponentProperties({ component, bandId }: { component: ReportComponent
             setStyleName('');
           }}
         >
-          <input className="ar-input" aria-label="New style name" placeholder="style name" value={styleName} onChange={(e) => setStyleName(e.target.value)} />
+          <input className="ar-input" aria-label={labels.newStyleName} placeholder={labels.styleNamePlaceholder} value={styleName} onChange={(e) => setStyleName(e.target.value)} />
           <button type="submit" className="ar-btn" disabled={!component.style}>
-            Save as style
+            {labels.saveAsStyle}
           </button>
         </form>
       </Section>
-      <Section title="Behavior">
-        <ExpressionField label="Visible if" value={component.visible} bandId={bandId} placeholder="always" onCommit={(visible) => update({ visible })} />
-        <h4 className="ar-panel-title">Conditional styles</h4>
+      <Section title={labels.behavior}>
+        <ExpressionField label={labels.visibleIf} value={component.visible} bandId={bandId} placeholder={labels.always} onCommit={(visible) => update({ visible })} />
+        <h4 className="ar-panel-title">{labels.conditionalStyles}</h4>
         {(component.conditions ?? []).map((cond, i) => (
-          <div key={i} className="ar-panel-section" style={{ padding: 4 }}>
+          <div key={i} className="ar-subsection">
             <ExpressionField
-              label="When"
+              label={labels.when}
               value={cond.expression}
               bandId={bandId}
               onCommit={(expression) => {
@@ -295,12 +311,13 @@ function ComponentProperties({ component, bandId }: { component: ReportComponent
                 update({ conditions: conditions.length ? conditions : undefined });
               }}
             >
-              Remove condition
+              {labels.removeCondition}
             </button>
           </div>
         ))}
-        <button type="button" className="ar-btn" onClick={() => update({ conditions: [...(component.conditions ?? []), { expression: 'true', style: { color: '#b91c1c' } }] })}>
-          Add condition
+        <button type="button" className="ar-btn ar-btn-outline ar-btn-sm" onClick={() => update({ conditions: [...(component.conditions ?? []), { expression: 'true', style: { color: '#b91c1c' } }] })}>
+          <Icon name="plus" />
+          {labels.addCondition}
         </button>
       </Section>
     </>
@@ -308,23 +325,24 @@ function ComponentProperties({ component, bandId }: { component: ReportComponent
 }
 
 function SortEditor({ region }: { region: DataRegion }) {
-  const { controller } = useDesignerContext();
+  const { controller, labels } = useDesignerContext();
   const rules = region.sort ?? [];
   const set = (sort: DataRegion['sort']) => controller.updateRegion(region.id, { sort: sort && sort.length ? sort : undefined });
   return (
     <>
-      <h4 className="ar-panel-title">Sort</h4>
+      <h4 className="ar-panel-title">{labels.sort}</h4>
       {rules.map((rule, i) => (
         <div key={i} className="ar-field-row">
-          <TextInput ariaLabel={`Sort expression ${i + 1}`} value={rule.expression} validate={validateExpression} onCommit={(expression) => set(rules.map((r, j) => (j === i ? { ...r, expression } : r)))} />
-          <SelectInput ariaLabel={`Sort direction ${i + 1}`} value={rule.direction} options={SORT_DIRECTIONS} onChange={(direction) => direction && set(rules.map((r, j) => (j === i ? { ...r, direction } : r)))} />
-          <button type="button" className="ar-btn" aria-label={`Remove sort ${i + 1}`} onClick={() => set(rules.filter((_, j) => j !== i))}>
-            ×
+          <TextInput ariaLabel={formatLabel(labels.sortExpression, { n: i + 1 })} value={rule.expression} validate={validateExpression} onCommit={(expression) => set(rules.map((r, j) => (j === i ? { ...r, expression } : r)))} />
+          <SelectInput ariaLabel={formatLabel(labels.sortDirection, { n: i + 1 })} value={rule.direction} options={SORT_DIRECTIONS} translate onChange={(direction) => direction && set(rules.map((r, j) => (j === i ? { ...r, direction } : r)))} />
+          <button type="button" className="ar-btn ar-btn-icon ar-btn-sm ar-btn-danger" aria-label={formatLabel(labels.removeSort, { n: i + 1 })} title={formatLabel(labels.removeSort, { n: i + 1 })} onClick={() => set(rules.filter((_, j) => j !== i))}>
+            <Icon name="close" />
           </button>
         </div>
       ))}
-      <button type="button" className="ar-btn" onClick={() => set([...rules, { expression: 'row.id', direction: 'asc' }])}>
-        Add sort
+      <button type="button" className="ar-btn ar-btn-outline ar-btn-sm" onClick={() => set([...rules, { expression: 'row.id', direction: 'asc' }])}>
+        <Icon name="plus" />
+        {labels.addSort}
       </button>
     </>
   );
@@ -335,21 +353,21 @@ function RegionProperties({ region }: { region: DataRegion }) {
   const isChild = !!findRegion(state.template, region.id)?.parent;
   const [newGroup, setNewGroup] = useState('row.');
   return (
-    <Section title={`Data band (${region.id})`}>
+    <Section title={`${labels.dataBand} (${region.id})`}>
       {!isChild || region.dataSource !== undefined ? (
-        <Field label="Data source">
+        <Field label={labels.dataSource}>
           {(id) => (
             <SelectInput id={id} value={region.dataSource} options={state.template.dataSources.map((d) => d.name)} onChange={(dataSource) => dataSource && controller.updateRegion(region.id, { dataSource })} />
           )}
         </Field>
       ) : (
-        <Field label="Relation">{(id) => <TextInput id={id} value={region.relation ?? ''} onCommit={(relation) => relation && controller.updateRegion(region.id, { relation })} />}</Field>
+        <Field label={labels.relation}>{(id) => <TextInput id={id} value={region.relation ?? ''} onCommit={(relation) => relation && controller.updateRegion(region.id, { relation })} />}</Field>
       )}
-      <ExpressionField label="Filter" value={region.filter} bandId={region.detail.id} placeholder="all rows" onCommit={(filter) => controller.updateRegion(region.id, { filter })} />
+      <ExpressionField label={labels.filter} value={region.filter} bandId={region.detail.id} placeholder={labels.allRows} onCommit={(filter) => controller.updateRegion(region.id, { filter })} />
       <SortEditor region={region} />
-      <CheckInput label="Show header" checked={!!region.header} onChange={(on) => controller.setRegionBand(region.id, 'header', on)} />
-      <CheckInput label="Show footer" checked={!!region.footer} onChange={(on) => controller.setRegionBand(region.id, 'footer', on)} />
-      <CheckInput label="Repeat header on each page" checked={!!region.repeatHeaderOnEachPage} onChange={(on) => controller.updateRegion(region.id, { repeatHeaderOnEachPage: on || undefined })} />
+      <CheckInput label={labels.showHeader} checked={!!region.header} onChange={(on) => controller.setRegionBand(region.id, 'header', on)} />
+      <CheckInput label={labels.showFooter} checked={!!region.footer} onChange={(on) => controller.setRegionBand(region.id, 'footer', on)} />
+      <CheckInput label={labels.repeatHeader} checked={!!region.repeatHeaderOnEachPage} onChange={(on) => controller.updateRegion(region.id, { repeatHeaderOnEachPage: on || undefined })} />
       <form
         className="ar-field-row"
         onSubmit={(e) => {
@@ -359,7 +377,7 @@ function RegionProperties({ region }: { region: DataRegion }) {
           setNewGroup('row.');
         }}
       >
-        <input className="ar-input" aria-label="Group expression" value={newGroup} aria-invalid={validateExpression(newGroup) ? true : undefined} onChange={(e) => setNewGroup(e.target.value)} />
+        <input className="ar-input" aria-label={labels.groupExpression} value={newGroup} aria-invalid={validateExpression(newGroup) ? true : undefined} onChange={(e) => setNewGroup(e.target.value)} />
         <button type="submit" className="ar-btn">
           {labels.addGroup}
         </button>
@@ -386,9 +404,9 @@ function ChildRegionForm({ region }: { region: DataRegion }) {
       }}
     >
       {arrays.length > 0 ? (
-        <SelectInput ariaLabel="Detail relation" value={value} options={arrays} onChange={(v) => setRelation(v ?? '')} />
+        <SelectInput ariaLabel={labels.detailRelation} value={value} options={arrays} onChange={(v) => setRelation(v ?? '')} />
       ) : (
-        <input className="ar-input" aria-label="Detail relation" placeholder="array field" value={relation} onChange={(e) => setRelation(e.target.value)} />
+        <input className="ar-input" aria-label={labels.detailRelation} placeholder={labels.arrayField} value={relation} onChange={(e) => setRelation(e.target.value)} />
       )}
       <button type="submit" className="ar-btn" disabled={!value}>
         {labels.addChildRegion}
@@ -400,18 +418,18 @@ function ChildRegionForm({ region }: { region: DataRegion }) {
 function GroupProperties({ group }: { group: Group }) {
   const { controller, labels } = useDesignerContext();
   return (
-    <Section title={`Group (${group.id})`}>
-      <ExpressionField label="Group by" value={group.expression} onCommit={(expression) => expression && controller.updateGroup(group.id, { expression })} />
-      <Field label="Order">{(id) => <SelectInput id={id} value={group.sortDirection ?? 'asc'} options={['asc', 'desc', 'none'] as const} onChange={(sortDirection) => controller.updateGroup(group.id, { sortDirection })} />}</Field>
-      <CheckInput label="Group header" checked={!!group.header} onChange={(on) => controller.setGroupBand(group.id, 'header', on)} />
-      <CheckInput label="Group footer" checked={!!group.footer} onChange={(on) => controller.setGroupBand(group.id, 'footer', on)} />
-      <CheckInput label="New page for each group" checked={!!group.pageBreakBefore} onChange={(on) => controller.updateGroup(group.id, { pageBreakBefore: on || undefined })} />
+    <Section title={`${labels.group} (${group.id})`}>
+      <ExpressionField label={labels.groupBy} value={group.expression} onCommit={(expression) => expression && controller.updateGroup(group.id, { expression })} />
+      <Field label={labels.order}>{(id) => <SelectInput id={id} value={group.sortDirection ?? 'asc'} options={['asc', 'desc', 'none'] as const} translate onChange={(sortDirection) => controller.updateGroup(group.id, { sortDirection })} />}</Field>
+      <CheckInput label={labels.groupHeader} checked={!!group.header} onChange={(on) => controller.setGroupBand(group.id, 'header', on)} />
+      <CheckInput label={labels.groupFooter} checked={!!group.footer} onChange={(on) => controller.setGroupBand(group.id, 'footer', on)} />
+      <CheckInput label={labels.newPagePerGroup} checked={!!group.pageBreakBefore} onChange={(on) => controller.updateGroup(group.id, { pageBreakBefore: on || undefined })} />
       <div className="ar-field-row">
         <button type="button" className="ar-btn" onClick={() => controller.moveGroup(group.id, -1)}>
-          Move out
+          {labels.moveOut}
         </button>
         <button type="button" className="ar-btn" onClick={() => controller.moveGroup(group.id, 1)}>
-          Move in
+          {labels.moveIn}
         </button>
         <button type="button" className="ar-btn ar-btn-danger" onClick={() => controller.removeGroup(group.id)}>
           {labels.removeGroup}
@@ -428,22 +446,26 @@ function BandProperties({ band, role }: { band: Band; role: string }) {
   const isPageBand = role === 'pageHeader' || role === 'pageFooter';
   return (
     <Section title={`${labels.band} (${band.id})`}>
-      <Field label={`Height (${unit})`}>{(id) => <NumberInput id={id} min={0} value={band.height} onCommit={(h) => controller.resizeBand(band.id, h ?? 0)} />}</Field>
+      <Field label={`${labels.height} (${unit})`}>{(id) => <NumberInput id={id} min={0} value={band.height} onCommit={(h) => controller.resizeBand(band.id, h ?? 0)} />}</Field>
       {!isPageBand && (
         <>
-          <CheckInput label="Grow to fit content" checked={band.canGrow !== false} onChange={(on) => update({ canGrow: on ? undefined : false })} />
-          <CheckInput label="Shrink to content" checked={!!band.canShrink} onChange={(on) => update({ canShrink: on || undefined })} />
-          <CheckInput label="Page break before" checked={!!band.pageBreakBefore} onChange={(on) => update({ pageBreakBefore: on || undefined })} />
-          <CheckInput label="Page break after" checked={!!band.pageBreakAfter} onChange={(on) => update({ pageBreakAfter: on || undefined })} />
+          <CheckInput label={labels.bandCanGrow} checked={band.canGrow !== false} onChange={(on) => update({ canGrow: on ? undefined : false })} />
+          <CheckInput label={labels.bandCanShrink} checked={!!band.canShrink} onChange={(on) => update({ canShrink: on || undefined })} />
+          <CheckInput label={labels.pageBreakBefore} checked={!!band.pageBreakBefore} onChange={(on) => update({ pageBreakBefore: on || undefined })} />
+          <CheckInput label={labels.pageBreakAfter} checked={!!band.pageBreakAfter} onChange={(on) => update({ pageBreakAfter: on || undefined })} />
         </>
       )}
       {isPageBand && (
         <>
-          <CheckInput label="Print on first page" checked={band.printOnFirstPage !== false} onChange={(on) => update({ printOnFirstPage: on ? undefined : false })} />
-          <CheckInput label="Print on last page" checked={band.printOnLastPage !== false} onChange={(on) => update({ printOnLastPage: on ? undefined : false })} />
+          <CheckInput label={labels.printOnFirstPage} checked={band.printOnFirstPage !== false} onChange={(on) => update({ printOnFirstPage: on ? undefined : false })} />
+          <CheckInput label={labels.printOnLastPage} checked={band.printOnLastPage !== false} onChange={(on) => update({ printOnLastPage: on ? undefined : false })} />
         </>
       )}
-      <ExpressionField label="Visible if" value={band.visible} bandId={band.id} placeholder="always" onCommit={(visible) => update({ visible })} />
+      <ExpressionField label={labels.visibleIf} value={band.visible} bandId={band.id} placeholder={labels.always} onCommit={(visible) => update({ visible })} />
+      <Field label={labels.bandColor}>
+        {(id) => <ColorInput id={id} ariaLabel={labels.bandColor} value={band.designColor} onChange={(designColor) => update({ designColor })} />}
+      </Field>
+      <p className="ar-hint">{labels.bandColorHint}</p>
       <StyleEditor
         style={band.style ?? {}}
         textProps={false}
@@ -458,25 +480,26 @@ function BandProperties({ band, role }: { band: Band; role: string }) {
 }
 
 function ReportProperties() {
-  const { controller, state, labels } = useDesignerContext();
+  const { controller, state, labels, values } = useDesignerContext();
   const t = state.template;
   const page = t.page;
   const custom = typeof page.size !== 'string';
   return (
     <>
       <Section title={labels.report}>
-        <Field label="Name">{(id) => <TextInput id={id} value={t.name} onCommit={(name) => name.trim() && controller.updateTemplate({ name })} />}</Field>
-        <Field label="Description">{(id) => <TextInput id={id} value={t.description ?? ''} onCommit={(d) => controller.updateTemplate({ description: d || undefined })} />}</Field>
-        <Field label="Locale">{(id) => <TextInput id={id} value={t.locale ?? ''} placeholder="en-US" onCommit={(locale) => controller.updateTemplate({ locale: locale || undefined })} />}</Field>
-        <Field label="Unit">{(id) => <SelectInput id={id} value={t.unit} options={UNITS} onChange={(unit) => unit && controller.updateTemplate({ unit })} />}</Field>
+        <Field label={labels.name}>{(id) => <TextInput id={id} value={t.name} onCommit={(name) => name.trim() && controller.updateTemplate({ name })} />}</Field>
+        <Field label={labels.description}>{(id) => <TextInput id={id} value={t.description ?? ''} onCommit={(d) => controller.updateTemplate({ description: d || undefined })} />}</Field>
+        <Field label={labels.locale}>{(id) => <TextInput id={id} value={t.locale ?? ''} placeholder="en-US" onCommit={(locale) => controller.updateTemplate({ locale: locale || undefined })} />}</Field>
+        <Field label={labels.unit}>{(id) => <SelectInput id={id} value={t.unit} options={UNITS} translate onChange={(unit) => unit && controller.updateTemplate({ unit })} />}</Field>
       </Section>
-      <Section title="Page">
-        <Field label="Size">
+      <Section title={labels.page}>
+        <Field label={labels.pageSize}>
           {(id) => (
             <SelectInput
               id={id}
               value={custom ? 'custom' : (page.size as string)}
               options={[...PAPER_SIZE_NAMES, 'custom']}
+              translate
               onChange={(size) => {
                 if (!size) return;
                 if (size === 'custom') controller.updateTemplate({ page: { ...page, size: { width: controller.bodyWidth() + page.margins.left + page.margins.right, height: 100 } } });
@@ -487,23 +510,23 @@ function ReportProperties() {
         </Field>
         {custom && typeof page.size !== 'string' && (
           <div className="ar-field-row">
-            <NumberInput ariaLabel={`Page width (${t.unit})`} min={1} value={page.size.width} onCommit={(width) => controller.updateTemplate({ page: { ...page, size: { ...(page.size as { width: number; height: number }), width: width ?? 1 } } })} />
-            <NumberInput ariaLabel={`Page height (${t.unit})`} min={1} value={page.size.height} onCommit={(height) => controller.updateTemplate({ page: { ...page, size: { ...(page.size as { width: number; height: number }), height: height ?? 1 } } })} />
+            <NumberInput ariaLabel={`${labels.pageWidth} (${t.unit})`} min={1} value={page.size.width} onCommit={(width) => controller.updateTemplate({ page: { ...page, size: { ...(page.size as { width: number; height: number }), width: width ?? 1 } } })} />
+            <NumberInput ariaLabel={`${labels.pageHeight} (${t.unit})`} min={1} value={page.size.height} onCommit={(height) => controller.updateTemplate({ page: { ...page, size: { ...(page.size as { width: number; height: number }), height: height ?? 1 } } })} />
           </div>
         )}
-        <Field label="Orientation">{(id) => <SelectInput id={id} value={page.orientation} options={ORIENTATIONS} onChange={(orientation) => orientation && controller.updateTemplate({ page: { ...page, orientation } })} />}</Field>
-        <div className="ar-field-grid" role="group" aria-label={`Margins (${t.unit})`}>
+        <Field label={labels.orientation}>{(id) => <SelectInput id={id} value={page.orientation} options={ORIENTATIONS} translate onChange={(orientation) => orientation && controller.updateTemplate({ page: { ...page, orientation } })} />}</Field>
+        <div className="ar-field-grid" role="group" aria-label={`${labels.margins} (${t.unit})`}>
           {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
             <label key={side} className="ar-hint">
-              {side}
-              <NumberInput ariaLabel={`Margin ${side} (${t.unit})`} min={0} value={page.margins[side]} onCommit={(v) => controller.updateTemplate({ page: { ...page, margins: { ...page.margins, [side]: v ?? 0 } } })} />
+              {values[side] ?? side}
+              <NumberInput ariaLabel={`${labels.margin} ${values[side] ?? side} (${t.unit})`} min={0} value={page.margins[side]} onCommit={(v) => controller.updateTemplate({ page: { ...page, margins: { ...page.margins, [side]: v ?? 0 } } })} />
             </label>
           ))}
         </div>
       </Section>
-      <Section title="Bands">
+      <Section title={labels.bands}>
         {(['reportHeader', 'pageHeader', 'pageFooter', 'reportFooter'] as const).map((slot) => (
-          <CheckInput key={slot} label={PAGE_BAND_LABELS[slot]} checked={!!t[slot]} onChange={(on) => controller.setPageBand(slot, on)} />
+          <CheckInput key={slot} label={labels[slot]} checked={!!t[slot]} onChange={(on) => controller.setPageBand(slot, on)} />
         ))}
         <div className="ar-field-row">
           <button type="button" className="ar-btn" onClick={() => controller.addStaticBand()}>
@@ -530,7 +553,7 @@ export function PropertiesPanel() {
     body = <ComponentProperties component={components[0]!} bandId={selection.bandId} />;
   } else if (components.length > 1) {
     body = (
-      <Section title={`${components.length} components`}>
+      <Section title={formatLabel(labels.componentsCount, { count: components.length })}>
         <StyleEditor style={{}} textProps={components.every((c) => c.type === 'text')} onChange={(patch) => controller.updateComponentStyle(patch)} />
       </Section>
     );
@@ -547,11 +570,23 @@ export function PropertiesPanel() {
       );
     }
   }
+  const subtitle =
+    components.length === 1
+      ? `${labels[components[0]!.type]} · ${components[0]!.id}`
+      : components.length > 1
+        ? formatLabel(labels.componentsCount, { count: components.length })
+        : selection.bandId
+          ? `${labels.band} · ${selection.bandId}`
+          : labels.report;
   return (
     <aside className="ar-panel ar-panel-right" aria-label={labels.properties}>
+      <div className="ar-panel-header">
+        {labels.properties}
+        <span className="ar-hint">{subtitle}</span>
+      </div>
       {body ?? <ReportProperties />}
       {state.errors.length > 0 && (
-        <Section title={`Template errors (${state.errors.length})`}>
+        <Section title={formatLabel(labels.templateErrors, { count: state.errors.length })}>
           <ul style={{ margin: 0, paddingLeft: 16 }}>
             {state.errors.slice(0, 20).map((e, i) => (
               <li key={i} className="ar-field-error">

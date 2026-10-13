@@ -20,7 +20,8 @@ import type { BandRole } from '../model/walk';
 import { compareValues, readPath, sameGroupKey, sortKey, toRows } from './data';
 import { mergeStyles, resolveBorder, resolveStyle } from './style';
 import { createStandardFontMeasurer, LINE_HEIGHT_FACTOR, wrapText, type TextMeasurer } from './text';
-import type { LayoutBand, LayoutDocument, LayoutIssue, LayoutItem, LayoutPage } from './types';
+import type { LayoutBand, LayoutDocument, LayoutIssue, LayoutItem, LayoutPage, LayoutTextRun } from './types';
+import { parseHtmlText, resolveRuns, runsText, wrapRuns } from './html';
 
 export interface GenerateOptions {
   /** Values for template parameters; override parameter defaults. */
@@ -455,7 +456,24 @@ class ReportGenerator {
       italic: style.fontStyle === 'italic',
     };
     const innerWidth = Math.max(0, base.width - style.padding.left - style.padding.right);
-    const lines = wrapText(text, innerWidth, font, this.measurer, c.wordWrap !== false);
+    let lines: string[];
+    let runs: LayoutTextRun[][] | undefined;
+    let richText: LayoutTextRun[] | undefined;
+    if (c.allowHtml && !error) {
+      richText = resolveRuns(parseHtmlText(text), {
+        bold: font.bold,
+        italic: font.italic,
+        underline: style.textDecoration === 'underline',
+        strike: style.textDecoration === 'line-through',
+        color: style.color,
+      });
+      runs = wrapRuns(richText, innerWidth, font, this.measurer, c.wordWrap !== false);
+      lines = runs.map(runsText);
+      text = runsText(richText);
+      if (typeof value === 'string') value = text;
+    } else {
+      lines = wrapText(text, innerWidth, font, this.measurer, c.wordWrap !== false);
+    }
     const lineHeight = style.fontSize * LINE_HEIGHT_FACTOR;
     let height = base.height;
     if (c.canGrow) {
@@ -464,6 +482,10 @@ class ReportGenerator {
     const item: LayoutItem = { ...base, height, kind: 'text', text, lines, lineHeight, value };
     if (c.format) item.format = c.format;
     if (error) item.error = true;
+    if (runs && richText) {
+      item.runs = runs;
+      item.richText = richText;
+    }
     return item;
   }
 

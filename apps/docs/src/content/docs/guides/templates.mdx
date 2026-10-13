@@ -1,0 +1,79 @@
+---
+title: Template format
+description: The structure of a report template and how it is validated.
+---
+
+A template is a JSON document. Lengths use the template `unit` (`mm`, `cm`, `in`, `pt` or `px`). Font sizes and border widths are always points.
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "name": "Sales",
+  "description": "optional",
+  "unit": "mm",
+  "locale": "en-US",                       // number and date formatting
+  "page": { "size": "A4", "orientation": "portrait", "margins": { "top": 10, "right": 10, "bottom": 10, "left": 10 } },
+  "dataSources": [{ "name": "orders", "path": "sales.orders" }],
+  "parameters": [{ "name": "title", "type": "string", "defaultValue": "Sales" }],
+  "styles": { "heading": { "fontSize": 16, "fontWeight": "bold" } },
+  "reportHeader": { /* band */ },
+  "pageHeader":   { /* band */ },
+  "pageFooter":   { /* band */ },
+  "reportFooter": { /* band */ },
+  "body": [ /* static bands and data regions */ ]
+}
+```
+
+## Page
+
+`size` is `A3`, `A4`, `A5`, `Letter`, `Legal`, or a custom `{ "width": 100, "height": 200 }` in template units (portrait dimensions). `orientation` swaps them for `landscape`. The body is the page width minus the left and right margins; components should stay within it.
+
+## Data sources
+
+A data source gives a name to a place in your data. `path` is a dot path into the data object and defaults to the name:
+
+```json
+{ "dataSources": [{ "name": "orders", "path": "sales.orders" }] }
+```
+
+With `{ "sales": { "orders": [ … ] } }` as data, expressions can use `orders` directly. Names must be valid JavaScript identifiers and may not clash with built-in names such as `row`, `rows`, `page` or `params`. The optional `fields` list describes the shape for the designer's field tree; the designer can detect it from sample data.
+
+## Parameters
+
+Parameters are values you pass in at run time, such as a title or a date range. In expressions they are `params.title`:
+
+```tsx
+<ReportViewer template={template} data={data} params={{ title: 'Q1 sales' }} />
+```
+
+Parameters that are not passed use their `defaultValue`.
+
+## Components
+
+Every band holds components, each positioned relative to the band's top-left corner. All components share `id` (unique in the template), `x`, `y`, `width`, `height`, and optional `name`, `styleName`, `style`, `conditions`, `visible` and `growToHeight`.
+
+| Type | Properties |
+| --- | --- |
+| `text` | `text` with `{{ }}` placeholders (`\{{` for a literal), `format`, `canGrow`, `wordWrap`, [`allowHtml`](/guides/html-text/) |
+| `image` | `src` (URL or data URI, may contain placeholders), `fit`: `contain`, `cover`, `fill`, `none` |
+| `line` | `orientation`: `horizontal` or `vertical`; width, color and dash come from `style.border` |
+| `rectangle` | `cornerRadius`; fill from `backgroundColor`, outline from `border` |
+
+With `growToHeight: true` a component stretches to the bottom of its band once the band height is known, so bordered table cells stay aligned when one cell grows. `visible` is an expression; the component is skipped when it is falsy.
+
+## Validation
+
+```ts
+import { parseTemplate, validateTemplate } from '@ariana-reports/core';
+
+const { valid, errors } = validateTemplate(json);
+// [{ path: 'body[0].detail.components[2].x', message: 'must be at least 0' }]
+
+const template = parseTemplate(text); // throws TemplateValidationError
+```
+
+Validation checks structure, references (data sources, named styles), unique ids, colors, and the syntax of every expression. The viewer and designer run it for you and show the messages.
+
+## Versioning
+
+`schemaVersion` is `1`. Future versions will read old templates, so keep it in stored templates.

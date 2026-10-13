@@ -1,9 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import {
   injectStyles,
-  mergeLabels,
+  PageList,
   renderPage,
+  resolveUiLocale,
+  themeVars,
   ZOOM_LEVELS,
+  type ArianaTheme,
   type ExcelExportOptions,
   type GenerateOptions,
   type Labels,
@@ -11,10 +14,13 @@ import {
   type LayoutIssue,
   type PdfExportOptions,
   type ReportTemplate,
+  type UiLocale,
   type ViewerController,
+  type ViewMode,
   type ZoomMode,
-} from '@ariana-report/core';
+} from '@ariana-reports/core';
 import { useLatest, useStore, useViewerController } from './hooks';
+import { Icon } from './Icon';
 
 export interface ReportViewerProps extends Omit<GenerateOptions, 'validate'> {
   /** Template object or JSON text. Regenerates when the reference changes. */
@@ -34,6 +40,17 @@ export interface ReportViewerProps extends Omit<GenerateOptions, 'validate'> {
   zoom?: number;
   zoomMode?: ZoomMode;
   labels?: Partial<Labels>;
+  /**
+   * UI language: a registered locale code such as "fa", or a `UiLocale`
+   * object. Sets the labels and the writing direction of the toolbar and
+   * panels. Report content is not affected; use `locale` for number and date
+   * formatting. Defaults to English.
+   */
+  uiLocale?: string | UiLocale;
+  /** UI colors, radius and font; e.g. `themeFromMui(useTheme())`. See `ArianaTheme`. */
+  theme?: ArianaTheme;
+  /** "continuous" (default) shows all pages in one scrollable column; "single" shows one page at a time. */
+  viewMode?: ViewMode;
   /** Use an external controller (e.g. to drive the viewer from your own UI). */
   controller?: ViewerController;
   /** Add the default stylesheet to the document. Defaults to true. */
@@ -54,27 +71,32 @@ export function ReportPage({
   pageIndex,
   zoom,
   allowImageSrc,
+  pageLabel,
 }: {
   document: LayoutDocument;
   pageIndex: number;
   zoom: number;
   allowImageSrc?: (src: string) => boolean;
+  /** Accessible page name with `{page}` and `{count}` placeholders. */
+  pageLabel?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const host = ref.current;
     if (!host || !doc.pages[pageIndex]) return;
-    host.replaceChildren(renderPage(doc, pageIndex, { scale: zoom, ownerDocument: host.ownerDocument, ...(allowImageSrc ? { allowImageSrc } : {}) }));
-  }, [doc, pageIndex, zoom, allowImageSrc]);
+    host.replaceChildren(
+      renderPage(doc, pageIndex, { scale: zoom, ownerDocument: host.ownerDocument, ...(allowImageSrc ? { allowImageSrc } : {}), ...(pageLabel ? { pageLabel } : {}) }),
+    );
+  }, [doc, pageIndex, zoom, allowImageSrc, pageLabel]);
   return <div ref={ref} className="ar-page-host" />;
 }
 
 function IssuesPanel({ issues, labels }: { issues: LayoutIssue[]; labels: Labels }) {
   return (
     <aside className="ar-issues" aria-label={labels.issues}>
-      <h2 className="ar-panel-title">{labels.issues}</h2>
+      <h2 className="ar-panel-header">{labels.issues}</h2>
       {issues.length === 0 ? (
-        <p className="ar-hint">{labels.noIssues}</p>
+        <p className="ar-hint ar-panel-section">{labels.noIssues}</p>
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {issues.map((issue, i) => (
@@ -105,6 +127,9 @@ export function ReportViewer(props: ReportViewerProps) {
     exports = {},
     showIssues = false,
     labels: labelOverrides,
+    uiLocale,
+    theme,
+    viewMode = 'continuous',
     controller: external,
     injectStyles: inject = true,
     save,
@@ -122,8 +147,12 @@ export function ReportViewer(props: ReportViewerProps) {
   } = props;
   const controller = useViewerController({ zoom: props.zoom, zoomMode: props.zoomMode }, external);
   const state = useStore(controller);
-  const labels = mergeLabels(labelOverrides);
+  const ui = resolveUiLocale(uiLocale, labelOverrides);
+  const labels = ui.labels;
+  const continuous = viewMode !== 'single';
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pagesRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<PageList | null>(null);
   const [issuesOpen, setIssuesOpen] = useState(showIssues);
   const [pageInput, setPageInput] = useState('1');
   const onErrorRef = useLatest(onError);
@@ -164,6 +193,29 @@ export function ReportViewer(props: ReportViewerProps) {
     return () => ro.disconnect();
   }, [controller]);
 
+  // Continuous mode: one PageList per scroll container; it renders pages lazily and reports the current page.
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    const host = pagesRef.current;
+    if (!continuous || !scroller || !host) return;
+    const list = new PageList(scroller, host, { onPageChange: (i) => controller.goToPage(i) });
+    listRef.current = list;
+    return () => {
+      list.destroy();
+      listRef.current = null;
+    };
+  }, [continuous, controller]);
+
+  useLayoutEffect(() => {
+    listRef.current?.update({
+      document: state.document,
+      zoom: state.zoom,
+      pageIndex: state.pageIndex,
+      ...(allowImageSrc ? { allowImageSrc } : {}),
+      pageLabel: labels.pageLabel,
+    });
+  });
+
   const run = (task: () => Promise<void>) => {
     task().catch((err: unknown) => onErrorRef.current?.(err instanceof Error ? err : new Error(String(err))));
   };
@@ -196,15 +248,15 @@ export function ReportViewer(props: ReportViewerProps) {
   const zoomPercent = Math.round(state.zoom * 100);
 
   return (
-    <div className={`ar-root ar-viewer${className ? ` ${className}` : ''}`} style={style}>
+    <div className={`ar-root ar-viewer${className ? ` ${className}` : ''}`} style={{ ...themeVars(theme), ...style }} dir={ui.dir} lang={ui.code}>
       {toolbar && (
-        <div className="ar-toolbar" role="toolbar" aria-label="Report viewer">
+        <div className="ar-toolbar" role="toolbar" aria-label={labels.viewerToolbar}>
           <div className="ar-toolbar-group">
-            <button type="button" className="ar-btn" aria-label={labels.firstPage} title={labels.firstPage} disabled={!hasDoc || atStart} onClick={() => controller.firstPage()}>
-              «
+            <button type="button" className="ar-btn ar-btn-icon" aria-label={labels.firstPage} title={labels.firstPage} disabled={!hasDoc || atStart} onClick={() => controller.firstPage()}>
+              <Icon name="firstPage" />
             </button>
-            <button type="button" className="ar-btn" aria-label={labels.previousPage} title={labels.previousPage} disabled={!hasDoc || atStart} onClick={() => controller.previousPage()}>
-              ‹
+            <button type="button" className="ar-btn ar-btn-icon" aria-label={labels.previousPage} title={labels.previousPage} disabled={!hasDoc || atStart} onClick={() => controller.previousPage()}>
+              <Icon name="previousPage" />
             </button>
             <input
               className="ar-input ar-input-page"
@@ -219,17 +271,17 @@ export function ReportViewer(props: ReportViewerProps) {
             <span className="ar-hint">
               {labels.pageOf} {state.pageCount}
             </span>
-            <button type="button" className="ar-btn" aria-label={labels.nextPage} title={labels.nextPage} disabled={!hasDoc || atEnd} onClick={() => controller.nextPage()}>
-              ›
+            <button type="button" className="ar-btn ar-btn-icon" aria-label={labels.nextPage} title={labels.nextPage} disabled={!hasDoc || atEnd} onClick={() => controller.nextPage()}>
+              <Icon name="nextPage" />
             </button>
-            <button type="button" className="ar-btn" aria-label={labels.lastPage} title={labels.lastPage} disabled={!hasDoc || atEnd} onClick={() => controller.lastPage()}>
-              »
+            <button type="button" className="ar-btn ar-btn-icon" aria-label={labels.lastPage} title={labels.lastPage} disabled={!hasDoc || atEnd} onClick={() => controller.lastPage()}>
+              <Icon name="lastPage" />
             </button>
           </div>
           <span className="ar-toolbar-sep" />
           <div className="ar-toolbar-group">
-            <button type="button" className="ar-btn" aria-label={labels.zoomOut} title={labels.zoomOut} onClick={() => controller.zoomOut()}>
-              −
+            <button type="button" className="ar-btn ar-btn-icon" aria-label={labels.zoomOut} title={labels.zoomOut} onClick={() => controller.zoomOut()}>
+              <Icon name="zoomOut" />
             </button>
             <select
               className="ar-select"
@@ -252,28 +304,32 @@ export function ReportViewer(props: ReportViewerProps) {
               <option value="fitWidth">{labels.fitWidth}</option>
               <option value="fitPage">{labels.fitPage}</option>
             </select>
-            <button type="button" className="ar-btn" aria-label={labels.zoomIn} title={labels.zoomIn} onClick={() => controller.zoomIn()}>
-              +
+            <button type="button" className="ar-btn ar-btn-icon" aria-label={labels.zoomIn} title={labels.zoomIn} onClick={() => controller.zoomIn()}>
+              <Icon name="zoomIn" />
             </button>
           </div>
           <span className="ar-spacer" />
           <div className="ar-toolbar-group">
             <button type="button" className="ar-btn" aria-pressed={issuesOpen} disabled={!hasDoc} onClick={() => setIssuesOpen((v) => !v)}>
+              <Icon name="issues" />
               {labels.issues}
               {issueCount > 0 ? ` (${issueCount})` : ''}
             </button>
             {exports.print !== false && (
               <button type="button" className="ar-btn" disabled={!hasDoc || state.busy} onClick={() => run(() => controller.print())}>
+                <Icon name="print" />
                 {labels.print}
               </button>
             )}
             {exports.pdf !== false && (
               <button type="button" className="ar-btn" title={labels.exportPdfTitle} disabled={!hasDoc || state.busy} onClick={() => run(() => controller.downloadPdf())}>
+                <Icon name="download" />
                 {labels.exportPdf}
               </button>
             )}
             {exports.excel !== false && (
               <button type="button" className="ar-btn" title={labels.exportExcelTitle} disabled={!hasDoc || state.busy} onClick={() => run(() => controller.downloadExcel())}>
+                <Icon name="download" />
                 {labels.exportExcel}
               </button>
             )}
@@ -289,10 +345,11 @@ export function ReportViewer(props: ReportViewerProps) {
               {state.error.message}
             </div>
           ) : doc ? (
-            <ReportPage document={doc} pageIndex={state.pageIndex} zoom={state.zoom} allowImageSrc={allowImageSrc} />
+            !continuous && <ReportPage document={doc} pageIndex={state.pageIndex} zoom={state.zoom} allowImageSrc={allowImageSrc} pageLabel={labels.pageLabel} />
           ) : (
             <div className="ar-status">{labels.noReport}</div>
           )}
+          {continuous && <div ref={pagesRef} className="ar-pages" hidden={!doc || !!state.error} />}
         </div>
         {issuesOpen && doc && <IssuesPanel issues={doc.issues} labels={labels} />}
       </div>

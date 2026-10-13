@@ -1,0 +1,62 @@
+---
+title: Formatting values
+description: Numbers, currencies, percentages and dates, in any locale or calendar.
+---
+
+import Demo from '../../../components/Demo.astro';
+
+A text component can carry a `format` that is applied to every `{{ }}` value in it:
+
+```json
+{ "id": "total", "type": "text", "text": "{{ row.total }}", "format": { "type": "currency", "currency": "EUR", "decimals": 2 } }
+```
+
+| Format | Options |
+| --- | --- |
+| `number` | `decimals`, `thousandsSeparator`, `prefix`, `suffix` |
+| `currency` | `currency` (ISO 4217 code such as `USD`), `decimals` |
+| `percent` | `decimals`. The value is a ratio: `0.25` becomes 25% |
+| `date` | `pattern`, `calendar` |
+
+Values that cannot be converted (for example text with a number format) are shown as they are.
+
+## Locale
+
+Formatting follows the report's locale: the template's `locale` (a BCP 47 tag such as `de-DE` or `fa-IR`, default `en-US`), or the `locale` prop of the viewer, which wins. It controls separators, currency symbols, month and weekday names, and **digits**: with `fa-IR` numbers and dates use Persian digits.
+
+```tsx
+<ReportViewer template={template} data={data} locale="de-DE" />
+```
+
+The same locale is used by `formatNumber`, `formatCurrency`, `formatPercent` and `formatDate` in expressions.
+
+## Date patterns
+
+Patterns support `yyyy yy MMMM MMM MM M dd d EEEE EEE HH H hh h mm m ss s SSS a` and `'quoted text'`. Date-only strings such as `"2026-03-01"` are read as local midnight, so they never shift by a day.
+
+```text
+{{ row.date }}  with  dd/MM/yyyy HH:mm   →  01/03/2026 14:30
+{{ formatDate(today(), 'EEEE d MMMM yyyy') }}   →  Tuesday 13 October 2026
+```
+
+## Calendars
+
+Dates are Gregorian unless you choose a `calendar`: `gregory`, `persian`, `islamic`, `islamic-umalqura`, `hebrew`, `buddhist`, `japanese` or `roc`. The Persian (Jalali) calendar is the one used in Iran and Afghanistan:
+
+```json
+{ "type": "date", "pattern": "yyyy/MM/dd", "calendar": "persian" }
+```
+
+In expressions, pass the calendar as the third argument:
+
+```text
+{{ formatDate(row.date, 'd MMMM yyyy', 'persian') }}
+```
+
+With `fa-IR` the first example gives `۱۴۰۵/۰۷/۲۱` for 13 October 2026. Excel cannot show other calendars in a date cell, so these dates are exported as text exactly as the report shows them.
+
+## Try it
+
+This Persian report uses the `fa-IR` locale for digits and the Persian calendar for dates:
+
+<Demo name="viewer-persian" example="persian" height={420} />

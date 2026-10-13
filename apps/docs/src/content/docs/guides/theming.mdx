@@ -1,0 +1,71 @@
+---
+title: Theming
+description: Colors, shape and fonts of the viewer and designer.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Demo from '../../../components/Demo.astro';
+
+The interface is styled with CSS variables set on its root element (`.ar-root`). There are three ways to set them.
+
+## 1. The `theme` prop
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { DARK_THEME, ReportViewer } from '@ariana-reports/react';
+
+    <ReportViewer theme={DARK_THEME} template={template} data={data} />
+    <ReportViewer theme={{ primary: '#6750a4', radius: 12, fontFamily: 'Inter, sans-serif' }} template={template} data={data} />
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <ReportViewer :theme="DARK_THEME" :template="template" :data="data" />
+    <ReportViewer :theme="{ primary: '#6750a4', radius: 12, fontFamily: 'Inter, sans-serif' }" :template="template" :data="data" />
+    ```
+  </TabItem>
+</Tabs>
+
+| Theme property | CSS variable | Used for |
+| --- | --- | --- |
+| `primary`, `onPrimary` | `--ar-primary`, `--ar-on-primary` | selection, focus rings, active buttons |
+| `background` | `--ar-bg` | workspace behind pages |
+| `surface`, `surfaceVariant` | `--ar-surface`, `--ar-surface-2` | toolbars, panels, section headers |
+| `inputBackground`, `border` | `--ar-input-bg`, `--ar-border` | inputs and dividers |
+| `text`, `textMuted`, `danger` | `--ar-text`, `--ar-muted`, `--ar-danger` | text, labels, errors |
+| `radius`, `fontFamily`, `fontSize` | `--ar-radius`, `--ar-font`, `--ar-font-size` | shape and typography |
+| `bandColor` | `--ar-band-color` | default band caption color in the designer |
+| `mode` | `color-scheme` | `light` or `dark`: native scrollbars and pickers |
+
+## 2. From a Material UI theme
+
+`themeFromMui(theme)` converts a MUI theme, so the report UI follows your palette and dark mode. See [Material UI](/getting-started/material-ui/).
+
+## 3. Plain CSS
+
+Set the variables in a rule for `.ar-root`. The defaults have zero specificity, so your rule wins whatever the order of the stylesheets:
+
+```css
+.ar-root {
+  --ar-primary: #6750a4;
+  --ar-surface: #fffbfe;
+}
+
+[data-theme='dark'] .ar-root {
+  --ar-bg: #1c1b1f;
+  --ar-surface: #2b2930;
+  --ar-text: #e6e1e5;
+  color-scheme: dark;
+}
+```
+
+The variables must be set on `.ar-root` itself (not on a parent). All class names start with `ar-` if you want to override individual rules.
+
+## Report pages stay white
+
+Pages and the design surface are drawn like paper, with the template's own colors, in every theme. Theming only changes the application chrome around them.
+
+## Try it
+
+<Demo name="viewer-theme" example="sales" height={520} />

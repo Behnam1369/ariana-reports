@@ -1,0 +1,78 @@
+---
+title: Installation
+description: Install ariana-report for React or Vue.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Pick the package for your framework. It includes `@ariana-reports/core`.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    <Tabs syncKey="pm">
+      <TabItem label="npm">
+        ```bash
+        npm install @ariana-reports/react
+        ```
+      </TabItem>
+      <TabItem label="pnpm">
+        ```bash
+        pnpm add @ariana-reports/react
+        ```
+      </TabItem>
+      <TabItem label="yarn">
+        ```bash
+        yarn add @ariana-reports/react
+        ```
+      </TabItem>
+    </Tabs>
+    Requires React 19 (`react` and `react-dom` are peer dependencies).
+  </TabItem>
+  <TabItem label="Vue">
+    <Tabs syncKey="pm">
+      <TabItem label="npm">
+        ```bash
+        npm install @ariana-reports/vue
+        ```
+      </TabItem>
+      <TabItem label="pnpm">
+        ```bash
+        pnpm add @ariana-reports/vue
+        ```
+      </TabItem>
+      <TabItem label="yarn">
+        ```bash
+        yarn add @ariana-reports/vue
+        ```
+      </TabItem>
+    </Tabs>
+    Requires Vue 3.5 or later (`vue` is a peer dependency).
+  </TabItem>
+</Tabs>
+
+Without a framework, install the engine alone:
+
+```bash
+npm install @ariana-reports/core
+```
+
+## What gets installed
+
+- `pdf-lib` and `exceljs` are dependencies of core. They are loaded with a dynamic `import()` the first time you export, so they do not slow down the first page load.
+- The packages are ES modules with CommonJS builds and TypeScript types. There is nothing to configure in Vite, webpack, Next.js or Nuxt.
+- The default stylesheet is injected for you, once. Set `injectStyles` to `false` to provide your own; all class names start with `ar-`.
+
+## Give it a height
+
+The viewer and designer fill their parent element, so the parent needs a height:
+
+```html
+<div style="height: 600px"> … </div>
+```
+
+## Checking the version
+
+```ts
+import { VERSION } from '@ariana-reports/core';
+console.log(VERSION);
+```

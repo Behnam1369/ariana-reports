@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: corepack enable
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Build, typecheck, test
+        run: corepack pnpm check
+      - name: Package lint (publint, are-the-types-wrong) and size budget
+        run: |
+          corepack pnpm lint:package
+          corepack pnpm size
+      - name: Build documentation site
+        run: corepack pnpm --filter docs build

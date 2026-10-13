@@ -7,7 +7,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@ariana-report/vue": "workspace:*",
+    "@ariana-reports/vue": "workspace:*",
     "vue": "3.5.43"
   },
   "devDependencies": {

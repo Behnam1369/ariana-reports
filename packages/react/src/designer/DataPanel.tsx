@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from 'react';
-import { COMPONENT_TYPES, FIELD_TYPES, findBand, type ComponentType, type FieldDefinition, type FieldType } from '@ariana-report/core';
+import { COMPONENT_TYPES, FIELD_TYPES, findBand, type ComponentType, type FieldDefinition, type FieldType } from '@ariana-reports/core';
 import { useDesignerContext, writePayload } from './context';
-import { CheckInput, Field, NumberInput, SelectInput, TextInput } from './inputs';
-
-const ICONS: Record<ComponentType, string> = { text: 'T', image: '▣', line: '—', rectangle: '▭' };
+import { CheckInput, Field, NumberInput, Section, SelectInput, TextInput } from './inputs';
+import { Icon } from '../Icon';
 
 /** Band that click-to-add targets: the selected band, else the first detail band, else the first band. */
 function targetBand(state: ReturnType<typeof useDesignerContext>['state'], sections: { band: { id: string }; role: string }[]): string | null {
@@ -14,8 +13,7 @@ function targetBand(state: ReturnType<typeof useDesignerContext>['state'], secti
 export function Toolbox() {
   const { controller, state, labels } = useDesignerContext();
   return (
-    <div className="ar-panel-section">
-      <h2 className="ar-panel-title">{labels.components}</h2>
+    <Section title={labels.components}>
       <div className="ar-toolbox">
         {COMPONENT_TYPES.map((type) => (
           <button
@@ -29,17 +27,17 @@ export function Toolbox() {
               if (bandId) controller.addComponent(bandId, type);
             }}
           >
-            <span aria-hidden="true">{ICONS[type]}</span>
+            <Icon name={type} />
             {labels[type]}
           </button>
         ))}
       </div>
-    </div>
+    </Section>
   );
 }
 
 function FieldTree({ fields, root, path }: { fields: FieldDefinition[]; root: string; path: string[] }) {
-  const { controller, state } = useDesignerContext();
+  const { controller, state, labels } = useDesignerContext();
   return (
     <ul className={`ar-tree${path.length === 0 ? ' ar-tree-root' : ''}`} role={path.length === 0 ? 'tree' : 'group'}>
       {fields.map((f) => {
@@ -54,11 +52,12 @@ function FieldTree({ fields, root, path }: { fields: FieldDefinition[]; root: st
               className="ar-tree-item"
               draggable
               tabIndex={0}
-              title="Drag onto a band, or press Enter to add to the selected band"
+              title={labels.fieldHint}
               onDragStart={(e) => writePayload(e.dataTransfer, { kind: 'field', root, path: fieldPath })}
               onDoubleClick={insert}
               onKeyDown={(e) => e.key === 'Enter' && insert()}
             >
+              <Icon name="field" />
               <span>{f.name}</span>
               <span className="ar-tree-type">{f.type}</span>
             </div>
@@ -93,17 +92,18 @@ export function DataPanel() {
   };
 
   return (
-    <div className="ar-panel-section">
-      <h2 className="ar-panel-title">{labels.data}</h2>
+    <Section title={labels.data}>
       {t.dataSources.map((ds) => (
-        <details key={ds.name} open>
+        <details key={ds.name} className="ar-source" open>
           <summary>
-            <strong>{ds.name}</strong>
+            <Icon name="database" />
+            <span>{ds.name}</span>
           </summary>
-          <Field label="Source name">
+          <div className="ar-source-body">
+          <Field label={labels.sourceName}>
             {(id) => <TextInput id={id} value={ds.name} onCommit={(name) => name && controller.updateDataSource(ds.name, { name })} />}
           </Field>
-          <Field label="Source path">
+          <Field label={labels.sourcePath}>
             {(id) => <TextInput id={id} value={ds.path ?? ''} placeholder={ds.name} onCommit={(path) => controller.updateDataSource(ds.name, { path: path || undefined })} />}
           </Field>
           <div className="ar-field-row">
@@ -116,17 +116,19 @@ export function DataPanel() {
               {labels.delete}
             </button>
           </div>
-          {ds.fields && ds.fields.length > 0 ? <FieldTree fields={ds.fields} root="row" path={[]} /> : <p className="ar-hint">No fields.</p>}
+          {ds.fields && ds.fields.length > 0 ? <FieldTree fields={ds.fields} root="row" path={[]} /> : <p className="ar-hint">{labels.noFields}</p>}
+          </div>
         </details>
       ))}
       <form className="ar-field-row" onSubmit={add} style={{ marginTop: 8 }}>
-        <input className="ar-input" aria-label="New data source name" placeholder="name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-        <button type="submit" className="ar-btn">
+        <input className="ar-input" aria-label={labels.newDataSourceName} placeholder={labels.namePlaceholder} value={newName} onChange={(e) => setNewName(e.target.value)} />
+        <button type="submit" className="ar-btn ar-btn-outline">
+          <Icon name="plus" />
           {labels.addDataSource}
         </button>
       </form>
       {error && <p className="ar-field-error" role="alert">{error}</p>}
-    </div>
+    </Section>
   );
 }
 
@@ -136,18 +138,19 @@ export function ParametersPanel() {
   const [newName, setNewName] = useState('');
   const [error, setError] = useState<string | null>(null);
   return (
-    <div className="ar-panel-section">
-      <h2 className="ar-panel-title">{labels.parameters}</h2>
+    <Section title={labels.parameters}>
       {params.map((p) => (
-        <details key={p.name}>
+        <details key={p.name} className="ar-source">
           <summary>
-            params.<strong>{p.name}</strong>
+            <Icon name="parameter" />
+            <span>params.{p.name}</span>
           </summary>
-          <Field label="Parameter label">{(id) => <TextInput id={id} value={p.label ?? ''} onCommit={(label) => controller.updateParameter(p.name, { label: label || undefined })} />}</Field>
-          <Field label="Parameter type">
-            {(id) => <SelectInput id={id} value={p.type} options={FIELD_TYPES} onChange={(type) => type && controller.updateParameter(p.name, { type: type as FieldType })} />}
+          <div className="ar-source-body">
+          <Field label={labels.parameterLabel}>{(id) => <TextInput id={id} value={p.label ?? ''} onCommit={(label) => controller.updateParameter(p.name, { label: label || undefined })} />}</Field>
+          <Field label={labels.parameterType}>
+            {(id) => <SelectInput id={id} value={p.type} options={FIELD_TYPES} translate onChange={(type) => type && controller.updateParameter(p.name, { type: type as FieldType })} />}
           </Field>
-          <Field label="Default value">
+          <Field label={labels.defaultValue}>
             {(id) =>
               p.type === 'number' ? (
                 <NumberInput id={id} optional value={typeof p.defaultValue === 'number' ? p.defaultValue : undefined} onCommit={(v) => controller.updateParameter(p.name, { defaultValue: v })} />
@@ -161,6 +164,7 @@ export function ParametersPanel() {
           <button type="button" className="ar-btn ar-btn-danger" aria-label={`${labels.delete} params.${p.name}`} onClick={() => controller.removeParameter(p.name)}>
             {labels.delete}
           </button>
+          </div>
         </details>
       ))}
       <form
@@ -179,12 +183,13 @@ export function ParametersPanel() {
           }
         }}
       >
-        <input className="ar-input" aria-label="New parameter name" placeholder="name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-        <button type="submit" className="ar-btn">
+        <input className="ar-input" aria-label={labels.newParameterName} placeholder={labels.namePlaceholder} value={newName} onChange={(e) => setNewName(e.target.value)} />
+        <button type="submit" className="ar-btn ar-btn-outline">
+          <Icon name="plus" />
           {labels.addParameter}
         </button>
       </form>
       {error && <p className="ar-field-error" role="alert">{error}</p>}
-    </div>
+    </Section>
   );
 }

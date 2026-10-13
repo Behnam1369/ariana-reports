@@ -4,6 +4,7 @@ import {
   h,
   markRaw,
   onBeforeUnmount,
+  nextTick,
   onMounted,
   ref,
   watch,
@@ -13,9 +14,13 @@ import {
 } from 'vue';
 import {
   injectStyles,
-  mergeLabels,
+  PageList,
   renderPage,
+  resolveUiLocale,
+  themeVars,
   ViewerController,
+  type ArianaTheme,
+  type IconName,
   ZOOM_LEVELS,
   type EvaluateOptions,
   type ExcelExportOptions,
@@ -25,9 +30,12 @@ import {
   type PdfExportOptions,
   type ReportTemplate,
   type TextMeasurer,
+  type UiLocale,
+  type ViewMode,
   type ZoomMode,
-} from '@ariana-report/core';
+} from '@ariana-reports/core';
 import { useStore } from './composables';
+import { icon } from './Icon';
 
 /** Renders one page of a layout document with the shared DOM renderer. */
 export const ReportPage = defineComponent({
@@ -37,6 +45,8 @@ export const ReportPage = defineComponent({
     pageIndex: { type: Number, required: true },
     zoom: { type: Number, default: 1 },
     allowImageSrc: { type: Function as PropType<(src: string) => boolean> },
+    /** Accessible page name with `{page}` and `{count}` placeholders. */
+    pageLabel: { type: String },
   },
   setup(props) {
     const host = ref<HTMLDivElement>();
@@ -45,7 +55,14 @@ export const ReportPage = defineComponent({
         const el = host.value;
         if (!el || !props.document.pages[props.pageIndex]) return;
         const allow = props.allowImageSrc;
-        el.replaceChildren(renderPage(props.document, props.pageIndex, { scale: props.zoom, ownerDocument: el.ownerDocument, ...(allow ? { allowImageSrc: allow } : {}) }));
+        el.replaceChildren(
+          renderPage(props.document, props.pageIndex, {
+            scale: props.zoom,
+            ownerDocument: el.ownerDocument,
+            ...(allow ? { allowImageSrc: allow } : {}),
+            ...(props.pageLabel ? { pageLabel: props.pageLabel } : {}),
+          }),
+        );
       });
     });
     return () => h('div', { ref: host, class: 'ar-page-host' });
@@ -54,9 +71,9 @@ export const ReportPage = defineComponent({
 
 function issuesPanel(issues: LayoutIssue[], labels: Labels): VNode {
   return h('aside', { class: 'ar-issues', 'aria-label': labels.issues }, [
-    h('h2', { class: 'ar-panel-title' }, labels.issues),
+    h('h2', { class: 'ar-panel-header' }, labels.issues),
     issues.length === 0
-      ? h('p', { class: 'ar-hint' }, labels.noIssues)
+      ? h('p', { class: 'ar-hint ar-panel-section' }, labels.noIssues)
       : h(
           'ul',
           { style: { listStyle: 'none', margin: 0, padding: 0 } },
@@ -97,6 +114,16 @@ export const ReportViewer = defineComponent({
     zoom: { type: Number },
     zoomMode: { type: String as PropType<ZoomMode> },
     labels: { type: Object as PropType<Partial<Labels>> },
+    /**
+     * UI language: a registered locale code such as "fa", or a `UiLocale`
+     * object. Sets the labels and writing direction of the toolbar and panels.
+     * Report content is not affected; use `locale` for number/date formatting.
+     */
+    uiLocale: { type: [String, Object] as PropType<string | UiLocale> },
+    /** "continuous" (default) shows all pages in one scrollable column; "single" shows one page at a time. */
+    viewMode: { type: String as PropType<ViewMode>, default: 'continuous' },
+    /** UI colors, radius and font; e.g. `themeFromMui(theme)`. See `ArianaTheme`. */
+    theme: { type: Object as PropType<ArianaTheme> },
     controller: { type: Object as PropType<ViewerController> },
     injectStyles: { type: Boolean, default: true },
     save: { type: Function as PropType<(bytes: Uint8Array, fileName: string, mimeType: string) => void> },
@@ -110,8 +137,11 @@ export const ReportViewer = defineComponent({
   setup(props, { emit, expose }) {
     const controller = markRaw(props.controller ?? new ViewerController({ zoom: props.zoom, zoomMode: props.zoomMode }));
     const state = useStore(controller);
-    const labels = computed(() => mergeLabels(props.labels));
+    const ui = computed(() => resolveUiLocale(props.uiLocale, props.labels));
+    const labels = computed(() => ui.value.labels);
     const scroller = ref<HTMLDivElement>();
+    const pagesHost = ref<HTMLDivElement>();
+    let pageList: PageList | null = null;
     const issuesOpen = ref(props.showIssues);
     const pageInput = ref('1');
     expose({ controller });
@@ -158,6 +188,29 @@ export const ReportViewer = defineComponent({
       { immediate: true },
     );
 
+    // Continuous mode: a PageList renders pages lazily and reports the current page while scrolling.
+    const syncPages = () =>
+      pageList?.update({
+        document: state.value.document,
+        zoom: state.value.zoom,
+        pageIndex: state.value.pageIndex,
+        ...(props.allowImageSrc ? { allowImageSrc: props.allowImageSrc } : {}),
+        pageLabel: labels.value.pageLabel,
+      });
+    const setupPages = () => {
+      pageList?.destroy();
+      pageList = null;
+      if (props.viewMode === 'single' || !scroller.value || !pagesHost.value) return;
+      pageList = new PageList(scroller.value, pagesHost.value, { onPageChange: (i) => controller.goToPage(i) });
+      syncPages();
+    };
+    onMounted(() => {
+      setupPages();
+      watch(() => props.viewMode, () => nextTick(setupPages));
+      watch(() => [state.value, props.allowImageSrc, labels.value.pageLabel], syncPages, { flush: 'post' });
+    });
+    onBeforeUnmount(() => pageList?.destroy());
+
     let ro: ResizeObserver | undefined;
     onMounted(() => {
       if (props.injectStyles) injectStyles(scroller.value?.ownerDocument);
@@ -195,8 +248,8 @@ export const ReportViewer = defineComponent({
       }
     };
 
-    const button = (label: string, text: string, disabled: boolean, onClick: () => void, title = label) =>
-      h('button', { type: 'button', class: 'ar-btn', 'aria-label': label, title, disabled, onClick }, text);
+    const button = (label: string, name: IconName, disabled: boolean, onClick: () => void, title = label) =>
+      h('button', { type: 'button', class: 'ar-btn ar-btn-icon', 'aria-label': label, title, disabled, onClick }, [icon(name)]);
 
     return () => {
       const s = state.value;
@@ -208,12 +261,13 @@ export const ReportViewer = defineComponent({
       const issueCount = doc?.issues.length ?? 0;
       const zoomValue = s.zoomMode === 'custom' ? String(s.zoom) : s.zoomMode;
       const exp = props.exports;
+      const continuous = props.viewMode !== 'single';
 
       const toolbar = props.toolbar
-        ? h('div', { class: 'ar-toolbar', role: 'toolbar', 'aria-label': 'Report viewer' }, [
+        ? h('div', { class: 'ar-toolbar', role: 'toolbar', 'aria-label': l.viewerToolbar }, [
             h('div', { class: 'ar-toolbar-group' }, [
-              button(l.firstPage, '«', !hasDoc || atStart, () => controller.firstPage()),
-              button(l.previousPage, '‹', !hasDoc || atStart, () => controller.previousPage()),
+              button(l.firstPage, 'firstPage', !hasDoc || atStart, () => controller.firstPage()),
+              button(l.previousPage, 'previousPage', !hasDoc || atStart, () => controller.previousPage()),
               h('input', {
                 class: 'ar-input ar-input-page',
                 'aria-label': l.pageNumber,
@@ -225,12 +279,12 @@ export const ReportViewer = defineComponent({
                 onKeydown: (e: KeyboardEvent) => e.key === 'Enter' && commitPage(),
               }),
               h('span', { class: 'ar-hint' }, `${l.pageOf} ${s.pageCount}`),
-              button(l.nextPage, '›', !hasDoc || atEnd, () => controller.nextPage()),
-              button(l.lastPage, '»', !hasDoc || atEnd, () => controller.lastPage()),
+              button(l.nextPage, 'nextPage', !hasDoc || atEnd, () => controller.nextPage()),
+              button(l.lastPage, 'lastPage', !hasDoc || atEnd, () => controller.lastPage()),
             ]),
             h('span', { class: 'ar-toolbar-sep' }),
             h('div', { class: 'ar-toolbar-group' }, [
-              button(l.zoomOut, '−', false, () => controller.zoomOut()),
+              button(l.zoomOut, 'zoomOut', false, () => controller.zoomOut()),
               h(
                 'select',
                 {
@@ -252,21 +306,21 @@ export const ReportViewer = defineComponent({
                   h('option', { value: 'fitPage', selected: zoomValue === 'fitPage' }, l.fitPage),
                 ],
               ),
-              button(l.zoomIn, '+', false, () => controller.zoomIn()),
+              button(l.zoomIn, 'zoomIn', false, () => controller.zoomIn()),
             ]),
             h('span', { class: 'ar-spacer' }),
             h('div', { class: 'ar-toolbar-group' }, [
               h(
                 'button',
                 { type: 'button', class: 'ar-btn', 'aria-pressed': issuesOpen.value, disabled: !hasDoc, onClick: () => (issuesOpen.value = !issuesOpen.value) },
-                `${l.issues}${issueCount > 0 ? ` (${issueCount})` : ''}`,
+                [icon('issues'), `${l.issues}${issueCount > 0 ? ` (${issueCount})` : ''}`],
               ),
-              exp.print !== false ? h('button', { type: 'button', class: 'ar-btn', disabled: !hasDoc || s.busy, onClick: () => run(() => controller.print()) }, l.print) : null,
+              exp.print !== false ? h('button', { type: 'button', class: 'ar-btn', disabled: !hasDoc || s.busy, onClick: () => run(() => controller.print()) }, [icon('print'), l.print]) : null,
               exp.pdf !== false
-                ? h('button', { type: 'button', class: 'ar-btn', title: l.exportPdfTitle, disabled: !hasDoc || s.busy, onClick: () => run(() => controller.downloadPdf()) }, l.exportPdf)
+                ? h('button', { type: 'button', class: 'ar-btn', title: l.exportPdfTitle, disabled: !hasDoc || s.busy, onClick: () => run(() => controller.downloadPdf()) }, [icon('download'), l.exportPdf])
                 : null,
               exp.excel !== false
-                ? h('button', { type: 'button', class: 'ar-btn', title: l.exportExcelTitle, disabled: !hasDoc || s.busy, onClick: () => run(() => controller.downloadExcel()) }, l.exportExcel)
+                ? h('button', { type: 'button', class: 'ar-btn', title: l.exportExcelTitle, disabled: !hasDoc || s.busy, onClick: () => run(() => controller.downloadExcel()) }, [icon('download'), l.exportExcel])
                 : null,
             ]),
           ])
@@ -275,13 +329,18 @@ export const ReportViewer = defineComponent({
       const content = s.error
         ? h('div', { class: 'ar-status ar-status-error', role: 'alert' }, [h('strong', l.reportError), '\n', s.error.message])
         : doc
-          ? h(ReportPage, { document: doc, pageIndex: s.pageIndex, zoom: s.zoom, allowImageSrc: props.allowImageSrc })
+          ? continuous
+            ? null
+            : h(ReportPage, { document: doc, pageIndex: s.pageIndex, zoom: s.zoom, allowImageSrc: props.allowImageSrc, pageLabel: l.pageLabel })
           : h('div', { class: 'ar-status' }, l.noReport);
 
-      return h('div', { class: 'ar-root ar-viewer' }, [
+      return h('div', { class: 'ar-root ar-viewer', style: themeVars(props.theme), dir: ui.value.dir, lang: ui.value.code }, [
         toolbar,
         h('div', { class: 'ar-viewer-body' }, [
-          h('div', { ref: scroller, class: 'ar-viewer-scroll', tabindex: 0, 'aria-busy': s.busy, onKeydown: onKeyDown }, [content]),
+          h('div', { ref: scroller, class: 'ar-viewer-scroll', tabindex: 0, 'aria-busy': s.busy, onKeydown: onKeyDown }, [
+            content,
+            continuous ? h('div', { ref: pagesHost, key: 'pages', class: 'ar-pages', hidden: !doc || !!s.error }) : null,
+          ]),
           issuesOpen.value && doc ? issuesPanel(doc.issues, l) : null,
         ]),
       ]);

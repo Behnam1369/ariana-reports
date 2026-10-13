@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, shallowRef } from 'vue';
-import { ReportDesigner, ReportViewer, type ReportTemplate } from '@ariana-report/vue';
+import { ReportDesigner, ReportViewer, type ReportTemplate } from '@ariana-reports/vue';
 import { SAMPLES, storageKey, type Sample } from '../../shared/samples';
 
 function loadTemplate(s: Sample): ReportTemplate {
@@ -11,6 +11,7 @@ function loadTemplate(s: Sample): ReportTemplate {
 const sample = shallowRef<Sample>(SAMPLES[0]!);
 const template = shallowRef<ReportTemplate>(loadTemplate(sample.value));
 const tab = ref<'viewer' | 'designer'>('viewer');
+const uiLocale = ref('en');
 // Bumped on reset or report change so the designer starts over.
 const version = ref(0);
 
@@ -43,13 +44,20 @@ function reset() {
           <option v-for="s in SAMPLES" :key="s.id" :value="s.id">{{ s.label }}</option>
         </select>
       </label>
+      <label>
+        Language
+        <select v-model="uiLocale">
+          <option value="en">English</option>
+          <option value="fa">فارسی</option>
+        </select>
+      </label>
       <button type="button" :aria-pressed="tab === 'viewer'" @click="tab = 'viewer'">Viewer</button>
       <button type="button" :aria-pressed="tab === 'designer'" @click="tab = 'designer'">Designer</button>
       <button type="button" class="demo-reset" @click="reset">Reset sample</button>
     </nav>
     <main class="demo-main">
-      <ReportViewer v-if="tab === 'viewer'" :key="sample.id" :template="template" :data="sample.data" zoom-mode="fitWidth" @error="console.error" />
-      <ReportDesigner v-else :key="`${sample.id}:${version}`" :template="template" :sample-data="sample.data" :on-save="onSave" />
+      <ReportViewer v-if="tab === 'viewer'" :key="sample.id" :template="template" :data="sample.data" zoom-mode="fitWidth" :ui-locale="uiLocale" @error="console.error" />
+      <ReportDesigner v-else :key="`${sample.id}:${version}`" :template="template" :sample-data="sample.data" :ui-locale="uiLocale" :on-save="onSave" />
     </main>
   </div>
 </template>

@@ -28,12 +28,15 @@ export function zoomOutStep(zoom: number): number {
   return [...ZOOM_LEVELS].reverse().find((z) => z < zoom - 1e-9) ?? MIN_ZOOM;
 }
 
+/** Horizontal and vertical space the viewer's scroll area keeps around the pages: 24px padding on each side. */
+export const FIT_PADDING = 48;
+
 /** Zoom that makes a page fit a container. `padding` is the CSS pixel gap kept around the page. */
 export function fitZoom(
   doc: Pick<LayoutDocument, 'pageWidth' | 'pageHeight'>,
   container: { width: number; height: number },
   mode: 'fitWidth' | 'fitPage',
-  padding = 32,
+  padding = FIT_PADDING,
 ): number {
   const w = (container.width - padding) / (doc.pageWidth * PX_PER_PT);
   const h = (container.height - padding) / (doc.pageHeight * PX_PER_PT);

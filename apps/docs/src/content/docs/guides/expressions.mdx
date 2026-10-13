@@ -1,0 +1,75 @@
+---
+title: Expressions
+description: The JavaScript expressions used in templates, and how they are kept safe.
+---
+
+Text, visibility, filters, sorting and conditions use JavaScript expressions. In text they go inside `{{ }}`:
+
+```text
+Total: {{ sum(rows, r => r.total) }}
+```
+
+Expressions are evaluated by a built-in interpreter. They never run through `eval` or `new Function`.
+
+**Supported:** literals, template literals, arrays and objects, `.` / `[]` / `?.`, calls, arrow functions with expression bodies, `! - + typeof`, arithmetic, comparison, `&& || ??` and `? :`.
+
+**Not supported:** assignment, statements, `new`, `this`, `function`, `class`, loops, regular expressions.
+
+A text that is a single `{{ expression }}` keeps the value's type, so numbers and dates can be formatted and exported to Excel as typed cells. Use `\{{` for a literal `{{`.
+
+## Variables
+
+| Name | Meaning |
+| --- | --- |
+| `row` | current row (detail, group and child bands) |
+| `rowNumber` | 1-based row number within the region |
+| `rows` | all rows of the region, after filter and sort |
+| `group` | `{ key, rows, count, index, level }` of the innermost group |
+| `groups` | all active groups, outermost first |
+| `parent` | the parent row inside a child region |
+| `params` | parameter values |
+| `page` | `{ number, count, regions }`, see [Running totals](/guides/page-totals/) |
+| `report` | `{ name, description }` |
+| `<dataSource>` | every data source by name, e.g. `orders` |
+
+## Functions
+
+| Group | Functions |
+| --- | --- |
+| Aggregates | `sum avg min max count first last distinct`. Each takes an array and an optional field name or `r => …` selector. |
+| Numbers | `round floor ceil abs`, and a safe `Math` |
+| Text | `upper lower trim len left right` |
+| Values | `string number isNull isEmpty coalesce iif` |
+| Dates | `now today date year month day addDays addMonths dateDiff` |
+| Formatting | `format formatNumber formatCurrency formatPercent formatDate` |
+| Words | `toWords(n)` and `toCurrencyWords(amount, currencyName, centsName)` (English) |
+
+Strings, numbers, arrays and dates expose the usual read-only methods (`map`, `filter`, `reduce`, `some`, `join`, `toUpperCase`, `padStart`, `toFixed`, `getFullYear`, …). `sort` and `reverse` return copies.
+
+```text
+{{ iif(row.stock < 10, 'Low', 'OK') }}
+{{ upper(row.name) }} ({{ row.qty }} × {{ formatCurrency(row.price, 'USD') }})
+{{ formatDate(today(), 'd MMMM yyyy') }}
+{{ distinct(orders, 'customer').length }} customers
+{{ toCurrencyWords(1250.5, 'Dollars', 'Cents') }}
+```
+
+## Your own functions
+
+Add functions with the `functions` option. Only these functions (and the built-ins) can be called from a template:
+
+```ts
+import { generateReport } from '@ariana-reports/core';
+
+generateReport(template, data, { functions: { vat: (n: number) => n * 0.09 } }); // {{ vat(row.total) }}
+```
+
+The viewer components take the same `functions` prop.
+
+## Safety
+
+Expressions can only read own properties of your data. `window`, globals, prototypes and `constructor` are unreachable, functions found in the data cannot be called, and every evaluation has limits on steps (`maxSteps`), call depth, string length and array size. An expression that loops forever or builds a huge array stops with an error instead of freezing the page.
+
+## Errors
+
+An expression that fails at run time shows `#ERROR` in its text box and is listed in `document.issues` and in the viewer's *Issues* panel. The rest of the report still renders. Syntax errors are caught earlier, by [validation](/guides/templates/#validation) and in the designer as you type.

@@ -143,7 +143,7 @@ export function excelNumberFormat(format: ValueFormat | undefined, locale = 'en-
     case 'percent':
       return `0${decimalsPart(format.decimals ?? 0)}%`;
     case 'date':
-      return datePatternToExcel(format.pattern);
+      return format.calendar && format.calendar !== 'gregory' ? undefined : datePatternToExcel(format.pattern);
   }
 }
 
@@ -167,6 +167,8 @@ export function cellValue(item: LayoutText, locale: string): { value: CellValue;
   const format = item.format;
   const numFmt = excelNumberFormat(format, locale);
 
+  // Excel cannot display other calendars, so those dates are exported as the text shown in the report.
+  if (format?.type === 'date' && format.calendar && format.calendar !== 'gregory') return { value: item.text };
   if (format?.type === 'date' || v instanceof Date) {
     const d = toDate(v);
     if (d && (v instanceof Date || typeof v === 'string' || typeof v === 'number')) {
@@ -378,7 +380,6 @@ class SheetWriter {
 
     const cell = this.ws.getCell(r1, c1);
     const { value, numFmt } = cellValue(item, this.doc.locale);
-    cell.value = value;
     if (numFmt) cell.numFmt = numFmt;
 
     const s = item.style;
@@ -393,6 +394,23 @@ class SheetWriter {
     const color = argb(s.color);
     if (color) font.color = { argb: color };
     cell.font = font;
+    if (item.richText && typeof value === 'string' && item.richText.some((r) => r.text !== '')) {
+      // allowHtml text becomes an Excel rich text value with one font per run.
+      cell.value = {
+        richText: item.richText
+          .filter((r) => r.text !== '')
+          .map((r) => {
+            const runFont: Partial<Font> = { name: font.name, size: font.size, bold: r.bold, italic: r.italic };
+            if (r.underline) runFont.underline = true;
+            if (r.strike) runFont.strike = true;
+            const runColor = argb(r.color);
+            if (runColor) runFont.color = { argb: runColor };
+            return { text: r.text, font: runFont };
+          }),
+      };
+    } else {
+      cell.value = value;
+    }
     cell.alignment = {
       horizontal: s.textAlign === 'justify' ? 'justify' : s.textAlign,
       vertical: s.verticalAlign,

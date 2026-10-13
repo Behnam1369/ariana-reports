@@ -1,5 +1,11 @@
 # ariana-report
 
+[![CI](https://github.com/Behnam1369/ariana-reports/actions/workflows/ci.yml/badge.svg)](https://github.com/Behnam1369/ariana-reports/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@ariana-reports/core?label=npm)](https://www.npmjs.com/package/@ariana-reports/core)
+[![license](https://img.shields.io/npm/l/@ariana-reports/core)](LICENSE)
+
+**[Documentation](https://ariana-reports.netlify.app)** · **[Playground](https://ariana-reports.netlify.app/playground/)** · **[Live demos](https://ariana-reports.netlify.app/demos/)**
+
 An open-source, frontend-only reporting toolkit for React and Vue.
 
 - **Banded reports**: report header/footer, page header/footer, data bands, groups and master-detail.
@@ -11,9 +17,9 @@ An open-source, frontend-only reporting toolkit for React and Vue.
 
 | Package | Description |
 | --- | --- |
-| [`@ariana-report/core`](packages/core) | Engine: template model, validation, expressions, layout, PDF/Excel export, viewer and designer logic |
-| [`@ariana-report/react`](packages/react) | React 19 `<ReportViewer>` and `<ReportDesigner>` |
-| [`@ariana-report/vue`](packages/vue) | Vue 3 `<ReportViewer>` and `<ReportDesigner>` |
+| [`@ariana-reports/core`](packages/core) | Engine: template model, validation, expressions, layout, PDF/Excel export, viewer and designer logic |
+| [`@ariana-reports/react`](packages/react) | React 19 `<ReportViewer>` and `<ReportDesigner>` |
+| [`@ariana-reports/vue`](packages/vue) | Vue 3 `<ReportViewer>` and `<ReportDesigner>` |
 
 The React and Vue packages re-export the whole core API, so an app only needs one of them.
 
@@ -22,11 +28,11 @@ The React and Vue packages re-export the whole core API, so an app only needs on
 ### React
 
 ```bash
-npm install @ariana-report/react
+npm install @ariana-reports/react
 ```
 
 ```tsx
-import { ReportDesigner, ReportViewer, type ReportTemplate } from '@ariana-report/react';
+import { ReportDesigner, ReportViewer, type ReportTemplate } from '@ariana-reports/react';
 import template from './sales.template.json';
 
 export function SalesReport({ data }: { data: unknown }) {
@@ -55,12 +61,12 @@ export function SalesDesigner({ data }: { data: unknown }) {
 ### Vue
 
 ```bash
-npm install @ariana-report/vue
+npm install @ariana-reports/vue
 ```
 
 ```vue
 <script setup lang="ts">
-import { ReportDesigner, ReportViewer } from '@ariana-report/vue';
+import { ReportDesigner, ReportViewer } from '@ariana-reports/vue';
 import template from './sales.template.json';
 defineProps<{ data: unknown }>();
 
@@ -82,7 +88,7 @@ The components fill their parent, so give the parent a height. They add a defaul
 ### Without a framework
 
 ```ts
-import { downloadBytes, exportPdf, generateReport, renderDocument } from '@ariana-report/core';
+import { downloadBytes, exportPdf, generateReport, renderDocument } from '@ariana-reports/core';
 
 const doc = generateReport(template, data, { params: { title: 'Q1' } });
 renderDocument(doc, document.getElementById('report')!); // HTML pages
@@ -157,19 +163,39 @@ All components have `id`, `x`, `y`, `width`, `height`, optional `name`, `styleNa
 
 | Type | Properties |
 | --- | --- |
-| `text` | `text` with `{{ }}` placeholders (`\{{` for a literal), `format`, `canGrow`, `wordWrap` |
+| `text` | `text` with `{{ }}` placeholders (`\{{` for a literal), `format`, `canGrow`, `wordWrap`, `allowHtml` |
 | `image` | `src` (URL or data URI, may contain placeholders), `fit`: `contain`, `cover`, `fill`, `none` |
 | `line` | `orientation`: `horizontal` or `vertical`; width, color and dash come from `style.border` |
 | `rectangle` | `cornerRadius`; fill from `backgroundColor`, outline from `border` |
 
 **Style** properties: `fontFamily`, `fontSize`, `fontWeight` (`normal`, `bold`), `fontStyle` (`normal`, `italic`), `textDecoration` (`none`, `underline`, `line-through`), `color`, `backgroundColor`, `textAlign` (`left`, `center`, `right`, `justify`), `verticalAlign` (`top`, `middle`, `bottom`), `padding`, `border` (`{ width, color, style: solid|dashed|dotted, sides }`). Colors are `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()` or `transparent`. Named styles are applied first, then `style`, then each matching entry of `conditions: [{ expression, style }]`.
 
-**Formats**: `{ "type": "number", "decimals", "thousandsSeparator", "prefix", "suffix" }`, `{ "type": "currency", "currency": "EUR", "decimals" }`, `{ "type": "percent", "decimals" }`, `{ "type": "date", "pattern": "dd/MM/yyyy HH:mm" }`. Date patterns support `yyyy yy MMMM MMM MM M dd d EEEE EEE HH H hh h mm m ss s SSS a` and `'quoted text'`.
+**Formats**: `{ "type": "number", "decimals", "thousandsSeparator", "prefix", "suffix" }`, `{ "type": "currency", "currency": "EUR", "decimals" }`, `{ "type": "percent", "decimals" }`, `{ "type": "date", "pattern": "dd/MM/yyyy HH:mm" }`. Date patterns support `yyyy yy MMMM MMM MM M dd d EEEE EEE HH H hh h mm m ss s SSS a` and `'quoted text'`. Add `"calendar": "persian"` (also `islamic`, `hebrew`, `buddhist`, `japanese`, `roc`) for non-Gregorian dates; numbers and dates use the locale's digits (۱۲۳ with `fa-IR`).
+
+### HTML formatting in text
+
+With `"allowHtml": true` a text component understands a small set of formatting tags, after placeholders are filled in (so data values may contain them too):
+
+| Tags | Effect |
+| --- | --- |
+| `<b>`, `<strong>` | bold |
+| `<i>`, `<em>` | italic |
+| `<u>`, `<ins>` | underline |
+| `<s>`, `<strike>`, `<del>` | line-through |
+| `<br>` | line break |
+| `<font color="red">` | text color (named, `#hex`, `rgb()`) |
+| `<span style="…">` | `color`, `background-color`, `font-weight`, `font-style`, `text-decoration` |
+
+```json
+{ "id": "note", "type": "text", "allowHtml": true, "text": "Total: <b>{{ row.total }}</b><br><font color=\"#b91c1c\">overdue</font>" }
+```
+
+Entities (`&amp;`, `&lt;`, `&nbsp;`, `&#…;`) are decoded. Any other tag (`<script>`, `<img>`, `<a>`, …) is removed together with its attributes and only its text is kept. The markup is parsed into styled text runs, which the viewer renders as text nodes, so it is never inserted as HTML. The same runs drive line wrapping, the PDF (bold/italic fonts per run) and Excel (rich text cells).
 
 ### Validation
 
 ```ts
-import { parseTemplate, validateTemplate } from '@ariana-report/core';
+import { parseTemplate, validateTemplate } from '@ariana-reports/core';
 
 const { valid, errors } = validateTemplate(json); // [{ path: 'body[0].detail.components[2].x', message: 'must be at least 0' }]
 const template = parseTemplate(text); // throws TemplateValidationError
@@ -246,21 +272,95 @@ Both components are thin views over framework-neutral controllers in core, which
 - `ViewerController`: `load(template, data)`, `goToPage`, `nextPage`, `zoomIn`, `setZoomMode('fitWidth')`, `downloadPdf()`, `downloadExcel()`, `print()`, `subscribe()`.
 - `DesignerController`: `addComponent`, `insertField`, `moveComponents`, `resizeComponent`, `align`, `distribute`, `addDataRegion`, `addGroup`, `addChildRegion`, `setPageBand`, `inferDataSourceFields`, `undo`, `redo`, `copy`, `paste`, `toJSON`, `load`, `preview`, `handleKey`, `subscribe()`.
 
-Pass your own controller to a component with the `controller` prop, or use the `useViewer` / `useDesigner` hooks (React) and composables (Vue). All UI text can be changed with the `labels` prop.
+Pass your own controller to a component with the `controller` prop, or use the `useViewer` / `useDesigner` hooks (React) and composables (Vue).
+
+**Viewer pages**: the viewer shows all pages in one scrollable column (`viewMode="continuous"`, the default). Only the pages near the visible area are rendered, the page number follows the scroll position, and the navigation buttons and PageUp/PageDown/Home/End scroll to a page. Use `viewMode="single"` to show one page at a time. Without a framework, `new PageList(scrollElement, hostElement, { onPageChange })` gives you the same continuous view.
+
+**Design surface**: page margins are drawn around the bands (toggle with the Margins button or `settings.showMargins`). Every band has an empty strip below it, so you can start a rubber-band selection even when components cover the whole band. Dragging components (one or a multi-selection) over another band moves them into that band; the target band is highlighted, and the move is one undo step.
+
+Selected components show eight resize handles centered on their edges. With several components selected, every one shows its handles, and dragging any handle resizes all of them by the same amount (for example to make a whole table row taller). Double-click a text (or use the expand button next to the Text property) to edit it in a large dialog with formatting buttons and a searchable list of fields, variables and functions; Ctrl+Enter applies, Esc cancels, and the change is one undo step.
+
+The alignment buttons in the designer toolbar align the content of the selected text boxes (left, center, right, justify; top, middle, bottom) and show the current alignment. Box positions can still be aligned and distributed with `controller.align()` / `distribute()`. A rubber-band selection can also start in the page margin or around the page; it selects in the band with the most hits.
+
+**Fonts**: the font list shows Helvetica, Times and Courier, every family already used in the template, the families of `preview.pdf.fonts`, and anything passed in the designer's `fonts` prop:
+
+```tsx
+const fonts = [{ family: 'Vazirmatn', data: await (await fetch('/fonts/Vazirmatn.ttf')).arrayBuffer() }];
+<ReportDesigner fonts={['Roboto']} preview={{ pdf: { fonts }, measurer: await createFontMeasurer(fonts) }} />
+```
+
+Listing a family only makes it selectable. The browser needs it (via `@font-face` in your app) to show it in the designer and viewer, and PDF export needs its file in `pdf.fonts`; without a file the PDF falls back to Helvetica.
+
+Band captions use a dark color and the band area a light tint of it. Change it per band with the "Band color" property (stored as `designColor` on the band; it only affects the designer) or for all bands with the theme's `bandColor`.
+
+### Theming (Material UI and others)
+
+Every color, the corner radius and the font of the viewer and designer come from CSS custom properties. Pass a `theme` prop, or set the variables yourself in CSS (`.ar-root { --ar-primary: #6750a4; }`):
+
+| Theme property | CSS variable | Used for |
+| --- | --- | --- |
+| `primary`, `onPrimary` | `--ar-primary`, `--ar-on-primary` | selection, focus rings, active buttons |
+| `background` | `--ar-bg` | workspace behind pages |
+| `surface`, `surfaceVariant` | `--ar-surface`, `--ar-surface-2` | toolbars, panels, section headers |
+| `inputBackground`, `border` | `--ar-input-bg`, `--ar-border` | inputs and dividers |
+| `text`, `textMuted`, `danger` | `--ar-text`, `--ar-muted`, `--ar-danger` | text, labels, errors |
+| `radius`, `fontFamily`, `fontSize` | `--ar-radius`, `--ar-font`, `--ar-font-size` | shape and typography |
+| `bandColor` | `--ar-band-color` | default band caption color in the designer |
+
+In a MUI app, `themeFromMui` converts your MUI theme (palette, dark mode, `shape.borderRadius`, typography), so the report UI follows theme and dark-mode switches automatically:
+
+```tsx
+import { useMemo } from 'react';
+import { useTheme } from '@mui/material/styles';
+import { ReportDesigner, themeFromMui } from '@ariana-reports/react';
+
+function Designer() {
+  const muiTheme = useTheme();
+  const theme = useMemo(() => themeFromMui(muiTheme, { bandColor: muiTheme.palette.grey[700] }), [muiTheme]);
+  return <ReportDesigner theme={theme} template={template} sampleData={data} />;
+}
+```
+
+`themeFromMui` reads only plain values from the theme object, so the packages do not depend on MUI. `DARK_THEME` is a ready-made dark preset for apps without MUI. Pages and the design surface stay white like paper in every theme.
+
+### Languages
+
+All UI text can be changed with the `labels` prop. For a complete translation pass `uiLocale` to the viewer and the designer. A Persian (Farsi) translation is built in; it also switches the toolbar and panels to right-to-left:
+
+```tsx
+<ReportDesigner uiLocale="fa" />
+<ReportViewer uiLocale="fa" template={template} data={data} />
+```
+
+`uiLocale` accepts a code (`"fa"`, `"fa-IR"`) or a locale object. Register more languages once, then use them by code:
+
+```ts
+import { registerUiLocale, type UiLocale } from '@ariana-reports/core';
+
+const de: UiLocale = {
+  code: 'de',
+  dir: 'ltr',
+  labels: { print: 'Drucken', nextPage: 'Nächste Seite' /* … missing labels fall back to English */ },
+  values: { bold: 'fett', portrait: 'Hochformat' }, // option values shown in select boxes
+};
+registerUiLocale(de);
+```
+
+`labels` overrides win over the locale. `uiLocale` only affects the UI; the report's number and date formatting comes from the template `locale` (or the viewer's `locale` prop). The design surface and the report pages stay left to right.
 
 **Designer shortcuts**: arrows move (Shift or Alt for fine steps), Delete removes, Ctrl/Cmd+Z / Shift+Z / Y undo and redo, Ctrl/Cmd+C / X / V / D copy, cut, paste and duplicate, Ctrl/Cmd+A selects the band, Escape cancels a drag or clears the selection. Drag components and data fields onto bands; drag a band's bottom edge to resize it.
 
 ## Security notes
 
 - Templates are validated and expressions are sandboxed, so templates from users cannot run code in your page.
-- The viewer only renders text with `textContent` and only loads images from `http(s)`, `blob:`, raster `data:image/…` and relative URLs (`allowImageSrc` to customize). SVG data URIs and `javascript:` URLs are rejected.
+- The viewer only renders text with `textContent` (including `allowHtml` text, which is parsed into styled runs, never inserted as HTML) and only loads images from `http(s)`, `blob:`, raster `data:image/…` and relative URLs (`allowImageSrc` to customize). SVG data URIs and `javascript:` URLs are rejected.
 - Image URLs in templates are fetched by the browser during viewing and export. If templates come from untrusted users, restrict them with `allowImageSrc` and `loadImage`.
 - Everything runs in the browser. Nothing is sent to a server unless your `onSave` handler does it.
 
 ## Known limitations (v1)
 
 - A band that does not fit on a page moves to the next page; bands taller than a page are clipped (with a warning).
-- Standard PDF fonts cover Latin text only; other scripts need a custom font. Right-to-left text layout is not supported yet.
+- Standard PDF fonts cover Latin text only; other scripts need a custom font. Arabic-script text (Persian, Arabic) shows correctly on screen but is not shaped or reordered in PDF files yet, and right-to-left text layout inside reports is not supported yet (the viewer and designer UI do support right-to-left with `uiLocale`).
 - Images must be PNG or JPEG.
 - The standard font metrics (about 130 kB) are bundled with the layout engine, because text is measured during layout.
 
@@ -279,14 +379,7 @@ The demos use the package sources directly, so they run without a build. Both of
 
 ### Publishing
 
-The packages are published under the `@ariana-report` npm scope:
-
-```bash
-corepack pnpm check
-corepack pnpm -r --filter "./packages/**" publish --access public
-```
-
-pnpm replaces `workspace:*` with the real version when publishing. Bump the versions in each `packages/*/package.json` (and `VERSION` in `packages/core/src/index.ts`) first.
+See [RELEASING.md](RELEASING.md).
 
 ## License
 

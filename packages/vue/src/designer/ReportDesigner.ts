@@ -4,22 +4,30 @@ import {
   DesignerController,
   downloadBytes,
   injectStyles,
-  mergeLabels,
+  fontFamilies,
+  resolveUiLocale,
   safeFileName,
-  type Alignment,
+  themeVars,
+  type ArianaTheme,
+  type IconName,
+  type TextAlign,
+  type VerticalAlign,
   type DesignerSettings,
   type ExcelExportOptions,
   type Labels,
   type PdfExportOptions,
   type ReportTemplate,
   type TextMeasurer,
-} from '@ariana-report/core';
+  type UiLocale,
+} from '@ariana-reports/core';
 import { useStore } from '../composables';
 import { ReportViewer } from '../ReportViewer';
 import { DESIGNER_KEY } from './context';
 import { DataPanel, ParametersPanel, Toolbox } from './DataPanel';
 import { DesignSurface } from './DesignSurface';
 import { PropertiesPanel } from './PropertiesPanel';
+import { TextEditor } from './TextEditor';
+import { icon } from '../Icon';
 
 /**
  * Report designer: banded design surface with drag and drop, properties,
@@ -36,7 +44,30 @@ export const ReportDesigner = defineComponent({
     sampleData: { type: null as unknown as PropType<unknown> },
     settings: { type: Object as PropType<Partial<DesignerSettings>> },
     labels: { type: Object as PropType<Partial<Labels>> },
-    preview: { type: Object as PropType<{ params?: Record<string, unknown>; measurer?: TextMeasurer; pdf?: PdfExportOptions; excel?: ExcelExportOptions }> },
+    /**
+     * UI language: a registered locale code such as "fa", or a `UiLocale`
+     * object. Sets the labels and writing direction of the toolbar and panels;
+     * the design surface itself stays left to right.
+     */
+    uiLocale: { type: [String, Object] as PropType<string | UiLocale> },
+    /** UI colors, radius and font; e.g. `themeFromMui(theme)`. See `ArianaTheme`. */
+    theme: { type: Object as PropType<ArianaTheme> },
+    /**
+     * Extra font families for the font lists, e.g. ["Vazirmatn"]. Families of
+     * `preview.pdf.fonts` are added automatically. The browser needs the font
+     * (via @font-face) to show it; register it in `pdf.fonts` for PDF export.
+     */
+    fonts: { type: Array as PropType<string[]> },
+    preview: {
+      type: Object as PropType<{
+        params?: Record<string, unknown>;
+        measurer?: TextMeasurer;
+        pdf?: PdfExportOptions;
+        excel?: ExcelExportOptions;
+        /** Decides which image sources the preview may load (default: http(s), blob, raster data URIs, relative URLs). */
+        allowImageSrc?: (src: string) => boolean;
+      }>,
+    },
     controller: { type: Object as PropType<DesignerController> },
     injectStyles: { type: Boolean, default: true },
     /** Save handler; may return a promise. When omitted, Save downloads the template JSON. */
@@ -48,13 +79,20 @@ export const ReportDesigner = defineComponent({
   setup(props, { emit, expose }) {
     const controller = markRaw(props.controller ?? new DesignerController({ template: props.template, sampleData: props.sampleData, settings: props.settings }));
     const state = useStore(controller);
-    const labels = computed(() => mergeLabels(props.labels));
+    const ui = computed(() => resolveUiLocale(props.uiLocale, props.labels));
+    const labels = computed(() => ui.value.labels);
+    const values = computed(() => ui.value.values);
+    const dir = computed(() => ui.value.dir);
     const zoom = ref(1);
     const mode = ref<'design' | 'preview'>('design');
     const message = ref<string | null>(null);
+    const editing = ref<string | null>(null);
     const fileInput = ref<HTMLInputElement>();
     const root = ref<HTMLDivElement>();
-    provide(DESIGNER_KEY, { controller, state, labels, zoom });
+    const fonts = computed(() =>
+      fontFamilies(state.value.template, [...(props.fonts ?? []), ...(props.preview?.pdf?.fonts ?? []).map((f) => f.family)]),
+    );
+    provide(DESIGNER_KEY, { controller, state, labels, values, dir, zoom, fonts, openTextEditor: (id: string) => (editing.value = id) });
     expose({ controller });
 
     onMounted(() => {
@@ -97,52 +135,57 @@ export const ReportDesigner = defineComponent({
       }
     };
 
-    const btn = (label: string, text: string, disabled: boolean, onClick: () => void, extra: Record<string, unknown> = {}) =>
-      h('button', { type: 'button', class: 'ar-btn', 'aria-label': label, title: label, disabled, onClick, ...extra }, text);
+    const btn = (label: string, name: IconName, disabled: boolean, onClick: () => void, extraClass = '') =>
+      h('button', { type: 'button', class: ['ar-btn ar-btn-icon', extraClass], 'aria-label': label, title: label, disabled, onClick }, [icon(name)]);
+    const toggle = (label: string, name: IconName, pressed: boolean, onClick: () => void) =>
+      h('button', { type: 'button', class: 'ar-btn ar-btn-icon', 'aria-label': label, title: label, 'aria-pressed': String(pressed), onClick }, [icon(name)]);
 
     return () => {
       const s = state.value;
       const l = labels.value;
       const sel = s.selection.componentIds.length;
-      const aligns: [Alignment, string, string][] = [
-        ['left', l.alignLeft, '⇤'],
-        ['center', l.alignCenter, '↔'],
-        ['right', l.alignRight, '⇥'],
-        ['top', l.alignTop, '⤒'],
-        ['middle', l.alignMiddle, '↕'],
-        ['bottom', l.alignBottom, '⤓'],
+      const alignment = controller.textAlignment();
+      const hasText = mode.value === 'design' && controller.selectedComponents().some((c) => c.type === 'text');
+      const textAligns: [TextAlign, string, IconName][] = [
+        ['left', l.alignLeft, 'textLeft'],
+        ['center', l.alignCenter, 'textCenter'],
+        ['right', l.alignRight, 'textRight'],
+        ['justify', l.alignJustify, 'textJustify'],
       ];
-      const toolbar = h('div', { class: 'ar-toolbar', role: 'toolbar', 'aria-label': 'Report designer' }, [
+      const verticalAligns: [VerticalAlign, string, IconName][] = [
+        ['top', l.alignTop, 'valignTop'],
+        ['middle', l.alignMiddle, 'valignMiddle'],
+        ['bottom', l.alignBottom, 'valignBottom'],
+      ];
+      const alignButton = (label: string, name: IconName, pressed: boolean, onClick: () => void) =>
+        h('button', { type: 'button', class: 'ar-btn ar-btn-icon', 'aria-label': label, title: label, 'aria-pressed': String(pressed), disabled: !hasText, onClick }, [icon(name)]);
+      const toolbar = h('div', { class: 'ar-toolbar', role: 'toolbar', 'aria-label': l.designerToolbar }, [
         h('div', { class: 'ar-toolbar-group' }, [
-          h('button', { type: 'button', class: 'ar-btn', onClick: () => confirmDiscard() && controller.load(createTemplate()) }, l.newReport),
-          h('button', { type: 'button', class: 'ar-btn', onClick: () => confirmDiscard() && fileInput.value?.click() }, l.openReport),
+          h('button', { type: 'button', class: 'ar-btn', onClick: () => confirmDiscard() && controller.load(createTemplate()) }, [icon('newFile'), l.newReport]),
+          h('button', { type: 'button', class: 'ar-btn', onClick: () => confirmDiscard() && fileInput.value?.click() }, [icon('open'), l.openReport]),
           h('input', { ref: fileInput, type: 'file', accept: '.json,application/json', hidden: true, 'aria-hidden': 'true', 'data-testid': 'ar-open-file', onChange: open }),
-          h('button', { type: 'button', class: 'ar-btn', onClick: () => void save() }, `${l.saveReport}${s.dirty ? ' •' : ''}`),
+          h('button', { type: 'button', class: 'ar-btn', onClick: () => void save() }, [icon('save'), `${l.saveReport}${s.dirty ? ' •' : ''}`]),
         ]),
         h('span', { class: 'ar-toolbar-sep' }),
-        h('div', { class: 'ar-toolbar-group' }, [btn(l.undo, '↶', !s.canUndo, () => controller.undo()), btn(l.redo, '↷', !s.canRedo, () => controller.redo())]),
+        h('div', { class: 'ar-toolbar-group' }, [btn(l.undo, 'undo', !s.canUndo, () => controller.undo()), btn(l.redo, 'redo', !s.canRedo, () => controller.redo())]),
         h('span', { class: 'ar-toolbar-sep' }),
-        h('div', { class: 'ar-toolbar-group', role: 'group', 'aria-label': l.align }, [
-          ...aligns.map(([a, label, icon]) => btn(label, icon, sel === 0 || mode.value !== 'design', () => controller.align(a))),
-          btn(l.distributeHorizontal, '⋯', sel < 3, () => controller.distribute('horizontal')),
-          btn(l.distributeVertical, '⋮', sel < 3, () => controller.distribute('vertical')),
-          btn(l.bringToFront, '⬒', sel === 0, () => controller.reorder('front')),
-          btn(l.sendToBack, '⬓', sel === 0, () => controller.reorder('back')),
-          btn(l.delete, '🗑', sel === 0, () => controller.removeComponents(), { class: 'ar-btn ar-btn-danger' }),
+        h('div', { class: 'ar-toolbar-group', role: 'group', 'aria-label': l.textAlignment }, [
+          ...textAligns.map(([a, label, name]) => alignButton(label, name, alignment.textAlign === a, () => controller.setTextAlign(a))),
+          ...verticalAligns.map(([a, label, name]) => alignButton(label, name, alignment.verticalAlign === a, () => controller.setVerticalAlign(a))),
         ]),
         h('span', { class: 'ar-toolbar-sep' }),
         h('div', { class: 'ar-toolbar-group' }, [
-          h('button', { type: 'button', class: 'ar-btn', 'aria-pressed': String(s.settings.showGrid), onClick: () => controller.updateSettings({ showGrid: !s.settings.showGrid }) }, l.showGrid),
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'ar-btn',
-              'aria-pressed': String(s.settings.snapToGrid),
-              onClick: () => controller.updateSettings({ snapToGrid: !s.settings.snapToGrid, snapToObjects: !s.settings.snapToGrid }),
-            },
-            l.snap,
-          ),
+          btn(l.distributeHorizontal, 'distributeHorizontal', sel < 3, () => controller.distribute('horizontal')),
+          btn(l.distributeVertical, 'distributeVertical', sel < 3, () => controller.distribute('vertical')),
+          btn(l.bringToFront, 'bringToFront', sel === 0, () => controller.reorder('front')),
+          btn(l.sendToBack, 'sendToBack', sel === 0, () => controller.reorder('back')),
+          btn(l.delete, 'delete', sel === 0, () => controller.removeComponents(), 'ar-btn-danger'),
+        ]),
+        h('span', { class: 'ar-toolbar-sep' }),
+        h('div', { class: 'ar-toolbar-group' }, [
+          toggle(l.showGrid, 'grid', s.settings.showGrid, () => controller.updateSettings({ showGrid: !s.settings.showGrid })),
+          toggle(l.snap, 'snap', s.settings.snapToGrid, () => controller.updateSettings({ snapToGrid: !s.settings.snapToGrid, snapToObjects: !s.settings.snapToGrid })),
+          toggle(l.showMargins, 'margins', s.settings.showMargins, () => controller.updateSettings({ showMargins: !s.settings.showMargins })),
           h(
             'select',
             { class: 'ar-select', 'aria-label': l.zoom, value: String(zoom.value), onChange: (e: Event) => (zoom.value = Number((e.target as HTMLSelectElement).value)) },
@@ -150,16 +193,21 @@ export const ReportDesigner = defineComponent({
           ),
         ]),
         h('span', { class: 'ar-spacer' }),
-        h('div', { class: 'ar-toolbar-group', role: 'tablist' }, [
-          h('button', { type: 'button', role: 'tab', class: 'ar-btn', 'aria-selected': String(mode.value === 'design'), 'aria-pressed': String(mode.value === 'design'), onClick: () => (mode.value = 'design') }, l.design),
-          h('button', { type: 'button', role: 'tab', class: 'ar-btn', 'aria-selected': String(mode.value === 'preview'), 'aria-pressed': String(mode.value === 'preview'), onClick: () => (mode.value = 'preview') }, l.preview),
+        h('div', { class: 'ar-tabs', role: 'tablist' }, [
+          h('button', { type: 'button', role: 'tab', class: 'ar-btn', 'aria-selected': String(mode.value === 'design'), onClick: () => (mode.value = 'design') }, [icon('design'), l.design]),
+          h('button', { type: 'button', role: 'tab', class: 'ar-btn', 'aria-selected': String(mode.value === 'preview'), onClick: () => (mode.value = 'preview') }, [icon('preview'), l.preview]),
         ]),
       ]);
 
       const body =
         mode.value === 'design'
           ? h('div', { class: 'ar-designer-body' }, [
-              h('aside', { class: 'ar-panel', 'aria-label': `${l.components} / ${l.data}` }, [h(Toolbox), h(DataPanel), h(ParametersPanel)]),
+              h('aside', { class: 'ar-panel', 'aria-label': `${l.components} / ${l.data}` }, [
+                h('div', { class: 'ar-panel-header', title: s.template.name }, s.template.name),
+                h(Toolbox),
+                h(DataPanel),
+                h(ParametersPanel),
+              ]),
               h(DesignSurface),
               h(PropertiesPanel),
             ])
@@ -170,15 +218,18 @@ export const ReportDesigner = defineComponent({
               measurer: props.preview?.measurer,
               pdf: props.preview?.pdf,
               excel: props.preview?.excel,
+              allowImageSrc: props.preview?.allowImageSrc,
               labels: props.labels,
+              uiLocale: props.uiLocale,
               showIssues: true,
               injectStyles: false,
             });
 
-      return h('div', { ref: root, class: 'ar-root ar-designer' }, [
+      return h('div', { ref: root, class: 'ar-root ar-designer', style: themeVars(props.theme), dir: ui.value.dir, lang: ui.value.code }, [
         toolbar,
         message.value ? h('div', { class: 'ar-status ar-status-error', role: 'alert', style: { padding: '6px 8px' } }, message.value) : null,
         body,
+        editing.value && mode.value === 'design' ? h(TextEditor, { key: editing.value, componentId: editing.value, onClose: () => (editing.value = null) }) : null,
       ]);
     };
   },

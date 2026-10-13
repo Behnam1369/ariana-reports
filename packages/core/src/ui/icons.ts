@@ -1,0 +1,66 @@
+/**
+ * Line icons used by the React and Vue toolbars and panels. Each icon is SVG
+ * path data for a 24x24 view box, drawn with `stroke="currentColor"`,
+ * `fill="none"`, round caps and joins. Render with `iconSvg()` or your own
+ * `<svg>` element.
+ */
+export const ICONS = {
+  newFile: 'M14 3H6v18h12V7z M14 3v4h4',
+  open: 'M3 6h6l2 2h10v11H3z',
+  save: 'M5 3h11l3 3v15H5z M8 3v5h8V3 M8 21v-7h8v7',
+  undo: 'M9 14 4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-3',
+  redo: 'M15 14l5-5-5-5 M20 9H9a5 5 0 0 0 0 10h3',
+  textLeft: 'M4 6h16 M4 10h10 M4 14h16 M4 18h10',
+  textCenter: 'M4 6h16 M7 10h10 M4 14h16 M7 18h10',
+  textRight: 'M4 6h16 M10 10h10 M4 14h16 M10 18h10',
+  textJustify: 'M4 6h16 M4 10h16 M4 14h16 M4 18h16',
+  valignTop: 'M4 4h16 M12 20V8 M8 12l4-4 4 4',
+  valignMiddle: 'M4 12h16 M12 3v5 M9 6l3 2 3-2 M12 21v-5 M9 18l3-2 3 2',
+  valignBottom: 'M4 20h16 M12 4v12 M8 12l4 4 4-4',
+  alignLeft: 'M4 3v18 M8 6h11v4H8z M8 14h7v4H8z',
+  alignCenter: 'M12 3v18 M6 6h12v4H6z M8 14h8v4H8z',
+  alignRight: 'M20 3v18 M5 6h11v4H5z M9 14h7v4H9z',
+  alignTop: 'M3 4h18 M6 8h4v11H6z M14 8h4v7h-4z',
+  alignMiddle: 'M3 12h18 M6 6h4v12H6z M14 8h4v8h-4z',
+  alignBottom: 'M3 20h18 M6 5h4v11H6z M14 9h4v7h-4z',
+  distributeHorizontal: 'M4 3v18 M20 3v18 M10 7h4v10h-4z',
+  distributeVertical: 'M3 4h18 M3 20h18 M7 10h10v4H7z',
+  bringToFront: 'M4 14V4h10 M8 8h12v12H8z',
+  sendToBack: 'M4 4h12v12H4z M20 10v10H10',
+  delete: 'M4 7h16 M10 11v6 M14 11v6 M6 7l1 13h10l1-13 M9 7V4h6v3',
+  grid: 'M3 3h18v18H3z M3 9h18 M3 15h18 M9 3v18 M15 3v18',
+  snap: 'M6 3v9a6 6 0 0 0 12 0V3h-4v9a2 2 0 0 1-4 0V3z M6 7h4 M14 7h4',
+  margins: 'M3 3h18v18H3z M7 7h10v10H7z',
+  zoomIn: 'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-4-4 M11 8v6 M8 11h6',
+  zoomOut: 'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-4-4 M8 11h6',
+  firstPage: 'M6 5v14 M18 6l-6 6 6 6',
+  previousPage: 'M15 6l-6 6 6 6',
+  nextPage: 'M9 6l6 6-6 6',
+  lastPage: 'M18 5v14 M6 6l6 6-6 6',
+  print: 'M7 9V3h10v6 M7 17H4v-7h16v7h-3 M7 14h10v7H7z',
+  download: 'M12 4v11 M7 10l5 5 5-5 M5 20h14',
+  issues: 'M12 3 2 21h20z M12 10v5 M12 18h.01',
+  design: 'M4 20h4L19 9l-4-4L4 16z M14 6l4 4',
+  preview: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z',
+  text: 'M5 5h14 M12 5v14 M9 19h6',
+  image: 'M3 5h18v14H3z M3 16l5-5 4 4 3-3 6 6 M15.5 8.5h.01',
+  line: 'M4 20 20 4',
+  rectangle: 'M4 6h16v12H4z',
+  database: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6 M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+  field: 'M4 7h16 M4 12h16 M4 17h10',
+  parameter: 'M8 4c-2 0-2 2-2 4s-2 4-2 4 2 0 2 4 0 4 2 4 M16 4c2 0 2 2 2 4s2 4 2 4-2 0-2 4 0 4-2 4',
+  expand: 'M4 10V4h6 M20 14v6h-6 M4 4l6 6 M20 20l-6-6',
+  chevron: 'M6 9l6 6 6-6',
+  close: 'M6 6l12 12 M18 6 6 18',
+  plus: 'M12 5v14 M5 12h14',
+  bold: 'M7 4h6a4 4 0 0 1 0 8H7z M7 12h7a4 4 0 0 1 0 8H7z',
+  italic: 'M10 4h8 M6 20h8 M14 4l-4 16',
+  underline: 'M7 4v7a5 5 0 0 0 10 0V4 M5 20h14',
+  strike: 'M5 12h14 M16 6.5C15.3 5 13.8 4 12 4c-2.5 0-4 1.4-4 3.3 0 1.4.9 2.3 2.4 2.9 M8 17.5c.7 1.5 2.2 2.5 4 2.5 2.5 0 4-1.4 4-3.3',
+  lineBreak: 'M20 5v6a3 3 0 0 1-3 3H6 M10 10l-4 4 4 4',
+} as const;
+
+export type IconName = keyof typeof ICONS;
+
+/** Icons that point in a reading direction and are mirrored in right-to-left UIs. */
+export const DIRECTIONAL_ICONS: ReadonlySet<IconName> = new Set(['firstPage', 'previousPage', 'nextPage', 'lastPage', 'undo', 'redo']);

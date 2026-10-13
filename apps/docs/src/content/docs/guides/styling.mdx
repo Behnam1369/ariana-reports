@@ -1,0 +1,61 @@
+---
+title: Styles and conditions
+description: Style components directly, with named styles, and conditionally.
+---
+
+import Demo from '../../../components/Demo.astro';
+
+## Style properties
+
+| Property | Values |
+| --- | --- |
+| `fontFamily` | `Helvetica`, `Times`, `Courier`, or a [registered font](/guides/fonts/) |
+| `fontSize` | points |
+| `fontWeight` / `fontStyle` | `normal`, `bold` / `normal`, `italic` |
+| `textDecoration` | `none`, `underline`, `line-through` |
+| `color` / `backgroundColor` | `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()` or `transparent` |
+| `textAlign` | `left`, `center`, `right`, `justify` |
+| `verticalAlign` | `top`, `middle`, `bottom` |
+| `padding` | one number, or `{ top, right, bottom, left }`, in template units |
+| `border` | `{ width, color, style, sides }`: `width` in points, `style` is `solid`, `dashed` or `dotted`, `sides` is a list of `top`, `right`, `bottom`, `left` (default all) |
+
+Lines take their width, color and dash from `border`. Rectangles are filled with `backgroundColor` and outlined with `border`.
+
+## Named styles
+
+Define styles once in `styles` and refer to them by name. A component's own `style` is applied on top:
+
+```json
+{
+  "styles": { "th": { "fontWeight": "bold", "color": "#fff", "backgroundColor": "#334155", "padding": 1.5 } },
+  "body": [{ "kind": "band", "id": "b", "height": 7, "components": [
+    { "id": "h", "type": "text", "x": 0, "y": 0, "width": 40, "height": 7, "styleName": "th", "style": { "textAlign": "right" }, "text": "Total" }
+  ]}]
+}
+```
+
+In the designer, *Save as style* turns a component's style into a named one.
+
+## Conditions
+
+`conditions` apply extra styles when an expression is true. Matching conditions are applied in order, after the named style and the inline style:
+
+```json
+{
+  "id": "status", "type": "text", "text": "{{ upper(row.status) }}",
+  "conditions": [
+    { "expression": "row.status === 'paid'", "style": { "color": "#15803d", "backgroundColor": "#dcfce7" } },
+    { "expression": "row.status === 'overdue'", "style": { "color": "#b91c1c", "backgroundColor": "#fee2e2" } }
+  ]
+}
+```
+
+<Demo name="viewer-conditional" example="invoices" height={440} />
+
+## Visibility
+
+`visible` on a component or a band is an expression. When it is falsy, the component or the whole band is skipped, and a band that is skipped takes no space:
+
+```json
+{ "id": "note", "type": "text", "text": "Out of stock", "visible": "row.stock === 0" }
+```

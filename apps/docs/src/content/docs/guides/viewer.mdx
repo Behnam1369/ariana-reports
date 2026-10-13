@@ -1,0 +1,75 @@
+---
+title: The viewer
+description: Props, view modes, zoom, the controller and using the engine without a framework.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Demo from '../../../components/Demo.astro';
+
+`ReportViewer` generates a report from a template and data and shows it with navigation, zoom, print and export.
+
+## Props
+
+| Prop | Description |
+| --- | --- |
+| `template` | Template object or JSON text. |
+| `data` | JSON data. |
+| `document` | A ready layout document to show instead of generating one. |
+| `params` | Parameter values, available as `params.<name>`. |
+| `locale` | Locale for numbers and dates. Overrides the template's `locale`. |
+| `functions` | Extra functions callable from expressions. |
+| `measurer` | Text measurer, see [Fonts](/guides/fonts/). |
+| `maxPages`, `maxSteps` | Safety limits (default 10 000 pages). |
+| `pdf`, `excel` | Export options. |
+| `toolbar` | Show the toolbar (default true). |
+| `exports` | `{ pdf, excel, print }` booleans. |
+| `showIssues` | Open the issues panel initially. |
+| `viewMode` | `continuous` (default) or `single`. |
+| `zoom`, `zoomMode` | Zoom factor, and `custom`, `fitWidth` or `fitPage`. |
+| `uiLocale`, `labels` | [User interface language](/guides/languages/) and label overrides. |
+| `theme` | [Colors, radius and font](/guides/theming/). |
+| `controller` | An external `ViewerController`. |
+| `allowImageSrc` | Decides which image sources the viewer may load (default: http(s), blob, raster data URIs, relative URLs). |
+| `save` | Replaces the browser download for exports. |
+| `injectStyles` | Add the default stylesheet (default true). |
+| `onError` / `@error` | Generation or export error. |
+| `onGenerated` / `@generated` | A new layout document is ready. |
+
+## Pages
+
+All pages are shown in one scrollable column. Only the pages near the visible area are rendered, so long reports stay fast, and the page number follows the scroll position. The toolbar's page buttons and the keys PageUp, PageDown, Home and End scroll to a page. `viewMode="single"` shows one page at a time.
+
+<Demo name="viewer-basic" example="products" height={520} />
+
+## Your own toolbar
+
+Every viewer is driven by a `ViewerController`. Hide the toolbar and use the controller, with the `useViewer` hook (React) or composable (Vue):
+
+<Demo name="viewer-controller" example="products" height={520} />
+
+Useful members: `load(template, data)`, `goToPage(index)`, `nextPage()`, `previousPage()`, `setZoom(1.25)`, `setZoomMode('fitWidth')`, `downloadPdf()`, `downloadExcel()`, `print()`, `regenerate()`, `getState()` and `subscribe(listener)`. The state holds `document`, `error`, `pageIndex`, `pageCount`, `zoom`, `zoomMode` and `busy`.
+
+## Without a framework
+
+The engine and the renderer have no framework dependency:
+
+```ts
+import { PageList, generateReport, renderDocument } from '@ariana-reports/core';
+
+const doc = generateReport(template, data, { params: { title: 'Q1' } });
+
+// All pages at once:
+renderDocument(doc, document.getElementById('report')!);
+
+// Or a continuous, lazily rendered view with page tracking:
+const scroller = document.getElementById('scroller')!;
+const host = document.getElementById('pages')!;
+const list = new PageList(scroller, host, { onPageChange: (index) => console.log('page', index + 1) });
+list.update({ document: doc, zoom: 1, pageIndex: 0 });
+```
+
+Issues (failed expressions, clipped bands) are in `doc.issues`.
+
+## Keyboard
+
+With the page area focused: PageDown / PageUp move between pages, Home / End go to the first / last page.

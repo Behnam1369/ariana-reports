@@ -1,0 +1,41 @@
+---
+title: Security
+description: What templates can and cannot do, and what to check when templates come from users.
+---
+
+Reports run in the user's browser, and templates are data. These rules keep a hostile template or hostile data from running code in your page.
+
+## Expressions are sandboxed
+
+Expressions run in an interpreter, not through `eval` or `new Function`. They can read your data and call the built-in functions and the ones you add; they cannot reach `window`, `document`, globals, prototypes or `constructor`, call functions found in your data, or loop forever. See [Expressions](/guides/expressions/#safety).
+
+## Text is never HTML
+
+The viewer sets text with `textContent`. With `allowHtml`, text is parsed into styled runs from a fixed list of tags; everything else is dropped, and the viewer creates text nodes, never HTML. See [HTML formatting](/guides/html-text/#why-it-is-safe).
+
+## Images
+
+The viewer loads images only from `http(s)` URLs, `blob:` URLs, raster `data:image/…` URIs and relative URLs. SVG data URIs and `javascript:` URLs are rejected. Because the browser fetches image URLs when a report is shown, a template can make the user's browser request any URL it names, which can reveal that the report was opened. If templates come from untrusted users, restrict the sources:
+
+```tsx
+<ReportViewer
+  template={template}
+  data={data}
+  allowImageSrc={(src) => src.startsWith('data:image/') || src.startsWith('https://cdn.example.com/')}
+  pdf={{ loadImage: async (src) => loadFromYourCdnOnly(src) }}
+/>
+```
+
+`allowImageSrc` applies to the on-screen viewer; `loadImage` in the `pdf` and `excel` options applies to exports.
+
+## Validate templates you store
+
+Validation checks structure, references and expression syntax. Run `parseTemplate` on the server before storing a template, see [Saving and loading](/guides/saving/#validate-on-the-server).
+
+## Data stays in the browser
+
+Nothing is sent to a server unless your own code does it (`onSave`, `save`, image URLs). There is no telemetry.
+
+## Reporting a vulnerability
+
+Please use the repository's private security advisory form instead of a public issue. See `SECURITY.md` in the repository.

@@ -7,6 +7,7 @@ import type {
   LayoutItem,
   LayoutLine,
   LayoutText,
+  LayoutTextRun,
   ResolvedBorder,
   ResolvedStyle,
 } from '../layout/types';
@@ -252,6 +253,7 @@ class PdfRenderer {
   private async text(item: LayoutText): Promise<void> {
     const { style } = item;
     this.box(item.x, item.y, item.width, item.height, style.backgroundColor, style.border);
+    if (item.runs) return this.richText(item, item.runs);
     const fill = this.color(style.color);
     if (!fill || item.lines.every((l) => l === '')) return;
 
@@ -289,6 +291,92 @@ class PdfRenderer {
           else if (style.textAlign === 'right') x += contentWidth - lineWidth;
           this.page.drawText(line, { x, y, size, font, color: fill.color, opacity: fill.opacity });
           this.decoration(style, x, baseline, lineWidth, fill);
+        }
+      });
+    } finally {
+      this.unclip();
+    }
+  }
+
+  /** Draws text with per-run fonts, colors and decorations (components with `allowHtml`). */
+  private async richText(item: LayoutText, lines: LayoutTextRun[][]): Promise<void> {
+    const { style } = item;
+    if (lines.every((runs) => runs.every((r) => r.text === ''))) return;
+    const size = style.fontSize;
+    const lh = item.lineHeight;
+    const pad = style.padding;
+    const contentX = item.x + pad.left;
+    const contentWidth = Math.max(0, item.width - pad.left - pad.right);
+    const contentTop = item.y + pad.top;
+    const available = item.height - pad.top - pad.bottom;
+    const textHeight = lines.length * lh;
+    const offset =
+      style.verticalAlign === 'middle' ? (available - textHeight) / 2 : style.verticalAlign === 'bottom' ? available - textHeight : 0;
+
+    // Resolve fonts up front; drawing below is synchronous.
+    type Piece = { text: string; font: PDFFont; width: number; run: LayoutTextRun };
+    const prepared: Piece[][] = [];
+    for (const runs of lines) {
+      const pieces: Piece[] = [];
+      for (const run of runs) {
+        const { font, standard } = await this.fonts.get({ ...style, fontWeight: run.bold ? 'bold' : 'normal', fontStyle: run.italic ? 'italic' : 'normal' });
+        const text = standard ? sanitizeForStandardFont(run.text) : run.text;
+        pieces.push({ text, font, width: font.widthOfTextAtSize(text, size), run });
+      }
+      prepared.push(pieces);
+    }
+    const metricsFont = prepared.flat()[0]?.font;
+    if (!metricsFont) return;
+    const full = metricsFont.heightAtSize(size);
+    const ascent = metricsFont.heightAtSize(size, { descender: false });
+
+    const drawPiece = (p: Piece, x: number, lineTop: number, baseline: number, width = p.width) => {
+      const bg = this.color(p.run.backgroundColor);
+      if (bg && width > 0) {
+        this.page.drawRectangle({ x, y: this.flipY(lineTop + lh), width, height: lh, color: bg.color, opacity: bg.opacity });
+      }
+      const fill = this.color(p.run.color);
+      if (!fill || p.text === '') return;
+      if (p.text.trim() !== '') this.page.drawText(p.text, { x, y: this.flipY(baseline), size, font: p.font, color: fill.color, opacity: fill.opacity });
+      if (p.run.underline) this.decoration({ ...style, textDecoration: 'underline' }, x, baseline, width, fill);
+      if (p.run.strike) this.decoration({ ...style, textDecoration: 'line-through' }, x, baseline, width, fill);
+    };
+
+    this.clip(item.x, item.y, item.width, item.height);
+    try {
+      prepared.forEach((pieces, i) => {
+        const lineTop = contentTop + offset + i * lh;
+        const baseline = lineTop + (lh - full) / 2 + ascent;
+        const lineText = pieces.map((p) => p.text).join('');
+        const isLast = i === prepared.length - 1;
+        if (style.textAlign === 'justify' && !isLast && /\S\s+\S/.test(lineText)) {
+          // Split into words and spaces; inner spaces share the free width.
+          const tokens: Piece[] = [];
+          for (const p of pieces) {
+            for (const part of p.text.split(/(\s+)/)) {
+              if (part !== '') tokens.push({ ...p, text: part, width: p.font.widthOfTextAtSize(part, size) });
+            }
+          }
+          while (tokens.length && tokens[0]!.text.trim() === '') tokens.shift();
+          while (tokens.length && tokens[tokens.length - 1]!.text.trim() === '') tokens.pop();
+          const words = tokens.filter((t) => t.text.trim() !== '');
+          const gaps = tokens.length - words.length;
+          const gap = gaps > 0 ? (contentWidth - words.reduce((s, t) => s + t.width, 0)) / gaps : 0;
+          let cursor = contentX;
+          for (const t of tokens) {
+            const w = t.text.trim() === '' ? gap : t.width;
+            drawPiece(t, cursor, lineTop, baseline, w);
+            cursor += w;
+          }
+          return;
+        }
+        const total = pieces.reduce((s, p) => s + p.width, 0);
+        let x = contentX;
+        if (style.textAlign === 'center') x += (contentWidth - total) / 2;
+        else if (style.textAlign === 'right') x += contentWidth - total;
+        for (const p of pieces) {
+          drawPiece(p, x, lineTop, baseline);
+          x += p.width;
         }
       });
     } finally {

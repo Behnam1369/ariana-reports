@@ -1,12 +1,20 @@
 import { inject, type ComputedRef, type InjectionKey, type Ref, type ShallowRef } from 'vue';
-import type { DesignerController, DesignerState, Labels } from '@ariana-report/core';
+import type { DesignerController, DesignerState, Labels } from '@ariana-reports/core';
 
 export interface DesignerContext {
   controller: DesignerController;
   state: Readonly<ShallowRef<DesignerState>>;
   labels: ComputedRef<Labels>;
+  /** Translations of option values shown in selects (see `UiLocale.values`). */
+  values: ComputedRef<Record<string, string>>;
+  /** Writing direction of the UI. */
+  dir: ComputedRef<'ltr' | 'rtl'>;
   /** Design surface zoom. */
   zoom: Ref<number>;
+  /** Font families offered in the font lists. */
+  fonts: ComputedRef<string[]>;
+  /** Opens the large text editor dialog for a text component. */
+  openTextEditor: (componentId: string) => void;
 }
 
 export const DESIGNER_KEY: InjectionKey<DesignerContext> = Symbol('ariana-report-designer');

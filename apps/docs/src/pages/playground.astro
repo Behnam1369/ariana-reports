@@ -1,0 +1,32 @@
+---
+import Playground from '../playground/Playground.tsx';
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Playground · ariana-report</title>
+    <meta name="description" content="Design a report, edit its JSON, and switch between React and Vue. Share the result with a link." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script is:inline>
+      // Follow the documentation site's light/dark choice.
+      (function () {
+        var stored = localStorage.getItem('starlight-theme');
+        var dark = stored === 'dark' || (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      })();
+    </script>
+    <style is:global>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <Playground client:only="react" />
+  </body>
+</html>

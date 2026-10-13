@@ -117,52 +117,88 @@ function pad(n: number, width: number): string {
   return String(n).padStart(width, '0');
 }
 
+/** Digits of the locale's default numbering system ("۰۱۲۳۴۵۶۷۸۹" for fa-IR), or null for Latin digits. */
+function localDigits(locale: string): string | null {
+  let sample: string;
+  try {
+    sample = numberFormatter(locale, { useGrouping: false }).format(9876543210);
+  } catch {
+    return null;
+  }
+  if (sample === '9876543210') return null;
+  const digits = [...sample].reverse();
+  return digits.length === 10 ? digits.join('') : null;
+}
+
+/** Year, month (1-12) and day of a date in a calendar. Gregorian dates use the local date components. */
+function calendarFields(value: Date, locale: string, calendar: string | undefined): { year: number; month: number; day: number } {
+  if (!calendar || calendar === 'gregory') return { year: value.getFullYear(), month: value.getMonth() + 1, day: value.getDate() };
+  const parts = dateFormatter(locale, { calendar, numberingSystem: 'latn', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(value);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  // "relatedYear" is how Intl reports the year of calendars with cyclic year names.
+  const year = Number.isFinite(get('year')) ? get('year') : get('relatedYear');
+  return { year, month: get('month'), day: get('day') };
+}
+
 /**
  * Formats a date with a pattern. Supported tokens:
  * yyyy yy MMMM MMM MM M dd d EEEE EEE HH H hh h mm m ss s SSS a.
  * Text in single quotes is literal; '' is a literal quote.
+ *
+ * Month and weekday names follow `locale`. Numbers use the locale's digits
+ * (Persian digits for fa-IR). `calendar` selects the calendar of the year,
+ * month and day tokens; the default is Gregorian, whatever the locale's own
+ * default calendar is.
  */
-export function formatDate(value: Date, pattern: string, locale = DEFAULT_LOCALE): string {
+export function formatDate(value: Date, pattern: string, locale = DEFAULT_LOCALE, calendar?: string): string {
+  const cal = calendar && calendar !== 'gregory' ? calendar : 'gregory';
+  const fields = calendarFields(value, locale, cal);
+  const digits = localDigits(locale);
+  const num = (n: number, width = 1): string => {
+    const text = pad(n, width);
+    return digits ? text.replace(/\d/g, (d) => digits[Number(d)]!) : text;
+  };
+  const named = (options: Intl.DateTimeFormatOptions) => dateFormatter(locale, { calendar: cal, ...options }).format(value);
   return pattern.replace(DATE_TOKEN, (token) => {
     switch (token) {
       case 'yyyy':
-        return pad(value.getFullYear(), 4);
+        return num(fields.year, 4);
       case 'yy':
-        return pad(value.getFullYear() % 100, 2);
+        return num(fields.year % 100, 2);
       case 'MMMM':
-        return dateFormatter(locale, { month: 'long' }).format(value);
+        return named({ month: 'long' });
       case 'MMM':
-        return dateFormatter(locale, { month: 'short' }).format(value);
+        return named({ month: 'short' });
       case 'MM':
-        return pad(value.getMonth() + 1, 2);
+        return num(fields.month, 2);
       case 'M':
-        return String(value.getMonth() + 1);
+        return num(fields.month);
       case 'dd':
-        return pad(value.getDate(), 2);
+        return num(fields.day, 2);
       case 'd':
-        return String(value.getDate());
+        return num(fields.day);
       case 'EEEE':
         return dateFormatter(locale, { weekday: 'long' }).format(value);
       case 'EEE':
         return dateFormatter(locale, { weekday: 'short' }).format(value);
       case 'HH':
-        return pad(value.getHours(), 2);
+        return num(value.getHours(), 2);
       case 'H':
-        return String(value.getHours());
+        return num(value.getHours());
       case 'hh':
-        return pad(value.getHours() % 12 || 12, 2);
+        return num(value.getHours() % 12 || 12, 2);
       case 'h':
-        return String(value.getHours() % 12 || 12);
+        return num(value.getHours() % 12 || 12);
       case 'mm':
-        return pad(value.getMinutes(), 2);
+        return num(value.getMinutes(), 2);
       case 'm':
-        return String(value.getMinutes());
+        return num(value.getMinutes());
       case 'ss':
-        return pad(value.getSeconds(), 2);
+        return num(value.getSeconds(), 2);
       case 's':
-        return String(value.getSeconds());
+        return num(value.getSeconds());
       case 'SSS':
-        return pad(value.getMilliseconds(), 3);
+        return num(value.getMilliseconds(), 3);
       case 'a': {
         const part = dateFormatter(locale, { hour: 'numeric', hour12: true })
           .formatToParts(value)
@@ -206,7 +242,7 @@ export function formatValue(value: unknown, format: ValueFormat | undefined, loc
   if (!format) return toDisplayString(value);
   if (format.type === 'date') {
     const d = toDate(value);
-    return d ? formatDate(d, format.pattern, locale) : toDisplayString(value);
+    return d ? formatDate(d, format.pattern, locale, format.calendar) : toDisplayString(value);
   }
   const n = typeof value === 'boolean' ? null : toNumber(value);
   if (n === null) return toDisplayString(value);

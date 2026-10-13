@@ -1,0 +1,72 @@
+---
+title: Introduction
+description: What ariana-report is, how it works, and what is in the box.
+---
+
+ariana-report is a reporting toolkit for the browser. You describe a report in a JSON **template**, give it JSON **data**, and it lays out the pages, shows them in a **viewer**, and exports them to **PDF** or **Excel**. A **designer** component lets people build and edit templates visually.
+
+Everything runs on the client. There is no report server, and nothing is sent anywhere unless your own code does it.
+
+## How it works
+
+```text
+template (JSON) + data (JSON)
+          │
+          ▼  generateReport()
+   layout document  ──►  viewer (HTML pages)
+   (pages, bands,   ──►  PDF   (pdf-lib)
+    positioned items)──► Excel (exceljs)
+```
+
+The layout engine resolves bands, evaluates expressions, wraps text with real font metrics and paginates. Every output reads the same layout document, so the screen, the PDF and the Excel file show the same report.
+
+## The packages
+
+| Package | What it is |
+| --- | --- |
+| `@ariana-reports/core` | The engine: template model and validation, expressions, layout, PDF and Excel export, and framework-neutral controllers for the viewer and designer. |
+| `@ariana-reports/react` | `<ReportViewer>` and `<ReportDesigner>` for React 19. |
+| `@ariana-reports/vue` | `<ReportViewer>` and `<ReportDesigner>` for Vue 3.5. |
+
+The React and Vue packages re-export all of core, so an app installs just one of them.
+
+## A report in three parts
+
+**1. A template** describes the bands and what they contain:
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "Sales",
+  "unit": "mm",
+  "page": { "size": "A4", "orientation": "portrait", "margins": { "top": 12, "right": 12, "bottom": 12, "left": 12 } },
+  "dataSources": [{ "name": "orders" }],
+  "body": [{
+    "kind": "dataRegion",
+    "id": "list",
+    "dataSource": "orders",
+    "detail": { "id": "row", "height": 7, "components": [
+      { "id": "customer", "type": "text", "x": 0, "y": 0, "width": 120, "height": 7, "text": "{{ row.customer }}" },
+      { "id": "total", "type": "text", "x": 120, "y": 0, "width": 66, "height": 7,
+        "style": { "textAlign": "right" }, "format": { "type": "currency", "currency": "USD" }, "text": "{{ row.total }}" }
+    ]}
+  }]
+}
+```
+
+**2. Data** is any JSON. Data sources are paths into it:
+
+```json
+{ "orders": [{ "customer": "Contoso", "total": 1200 }, { "customer": "Fabrikam", "total": 89.5 }] }
+```
+
+**3. A component** shows the result. See [Your first report](/getting-started/first-report/).
+
+## Browser support
+
+Current versions of Chrome, Edge, Firefox and Safari. The designer's stylesheet uses `color-mix()`, which needs Chrome 111, Safari 16.2 or Firefox 113 or later. The packages ship ES2022 code.
+
+## What it is not
+
+- It is not a server-side renderer. If you need reports generated on a server without a browser, run the core package in Node for PDF and Excel output, or use a headless browser.
+- It does not shape complex scripts in PDF files yet. See the [known limitations](/project/limitations/).

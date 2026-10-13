@@ -14,4 +14,4 @@ export const ArianaReport = {
 };
 
 // Re-export the core API so apps can depend on a single package.
-export * from '@ariana-report/core';
+export * from '@ariana-reports/core';

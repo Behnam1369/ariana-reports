@@ -11,5 +11,15 @@ export {
   type StandardFontFamily,
   type TextMeasurer,
 } from './text';
+export {
+  decodeEntities,
+  HTML_TAGS,
+  parseHtmlText,
+  resolveRuns,
+  runsText,
+  wrapRuns,
+  type RunBase,
+  type TextRun,
+} from './html';
 export { DEFAULT_STYLE, mergeStyles, resolveBorder, resolvePadding, resolveStyle } from './style';
 export { compareValues, readPath, toRows } from './data';

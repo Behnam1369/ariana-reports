@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generateReport, STYLE_ELEMENT_ID, ViewerController } from '@ariana-report/core';
+import { generateReport, STYLE_ELEMENT_ID, ViewerController } from '@ariana-reports/core';
 import { ReportViewer, useViewer } from '../src';
 import { salesData, salesTemplate } from './fixtures';
 
@@ -10,9 +10,46 @@ afterEach(cleanup);
 const pageTexts = (container: HTMLElement) => Array.from(container.querySelectorAll('.ar-text')).map((e) => e.textContent);
 
 describe('ReportViewer', () => {
-  it('generates and shows the first page with page info', () => {
+  it('shows every page in one scrollable column by default', () => {
     const onGenerated = vi.fn();
     const { container } = render(<ReportViewer template={salesTemplate()} data={salesData} onGenerated={onGenerated} />);
+    const pages = onGenerated.mock.calls[0]![0].pages.length;
+    expect(container.querySelectorAll('.ar-pages > .ar-page-slot')).toHaveLength(pages);
+    // jsdom has no IntersectionObserver, so every page is rendered.
+    expect(container.querySelectorAll('.ar-page')).toHaveLength(pages);
+    expect(pageTexts(container)).toContain('Litware');
+    expect(container.querySelector('.ar-page')!.getAttribute('aria-label')).toBe(`Page 1 of ${pages}`);
+  });
+
+  it('updates the page number while scrolling and scrolls when navigating', async () => {
+    const { container } = render(<ReportViewer template={salesTemplate()} data={salesData} />);
+    const scroller = container.querySelector('.ar-viewer-scroll') as HTMLElement;
+    const slots = Array.from(container.querySelectorAll<HTMLElement>('.ar-page-slot'));
+    const pageHeight = 300;
+    const rect = (top: number, height: number) => () => ({ left: 0, top, right: 400, bottom: top + height, width: 400, height, x: 0, y: top, toJSON: () => ({}) });
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 400 });
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: slots.length * pageHeight + 1000 });
+    scroller.getBoundingClientRect = rect(0, 400);
+    slots.forEach((slot, i) => (slot.getBoundingClientRect = () => rect(i * pageHeight - scroller.scrollTop, pageHeight)()));
+    scroller.scrollTop = pageHeight + 10;
+    fireEvent.scroll(scroller);
+    await vi.waitFor(() => expect((screen.getByLabelText('Page number') as HTMLInputElement).value).toBe('2'));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'First page' }));
+    expect(scroller.scrollTop).toBe(0);
+    expect((screen.getByLabelText('Page number') as HTMLInputElement).value).toBe('1');
+  });
+
+  it('translates the toolbar and switches to right-to-left with uiLocale="fa"', () => {
+    const { container } = render(<ReportViewer template={salesTemplate()} data={salesData} uiLocale="fa" labels={{ print: 'چاپ گزارش' }} />);
+    expect(container.querySelector('.ar-root')!.getAttribute('dir')).toBe('rtl');
+    expect(screen.getByRole('button', { name: 'صفحهٔ بعد' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'چاپ گزارش' })).toBeTruthy();
+    expect(container.querySelector('.ar-page')!.getAttribute('aria-label')).toMatch(/^صفحهٔ 1 از/);
+  });
+
+  it('can show one page at a time', () => {
+    const onGenerated = vi.fn();
+    const { container } = render(<ReportViewer template={salesTemplate()} data={salesData} onGenerated={onGenerated} viewMode="single" />);
     expect(onGenerated).toHaveBeenCalledTimes(1);
     const pages = onGenerated.mock.calls[0]![0].pages.length;
     expect(pages).toBeGreaterThan(1);

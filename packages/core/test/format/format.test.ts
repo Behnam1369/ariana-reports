@@ -164,3 +164,49 @@ describe('formatValue', () => {
     expect(formatValue(1234.5, { type: 'currency', currency: 'EUR' }, 'de-DE')).toBe('1.234,50\u00a0€');
   });
 });
+
+describe('calendars and locale digits', () => {
+  const date = new Date(2026, 9, 13, 14, 5); // 13 October 2026
+
+  it('always writes Gregorian month names unless a calendar is given, whatever the locale default', () => {
+    expect(formatDate(date, 'd MMMM yyyy', 'en-US')).toBe('13 October 2026');
+    // fa-IR defaults to the Persian calendar for names; the Gregorian pattern must stay Gregorian.
+    expect(formatDate(date, 'd MMMM yyyy', 'fa-IR')).toBe('۱۳ اکتبر ۲۰۲۶');
+  });
+
+  it('formats Persian (Jalali) dates', () => {
+    expect(formatDate(date, 'yyyy/MM/dd', 'fa-IR', 'persian')).toBe('۱۴۰۵/۰۷/۲۱');
+    expect(formatDate(date, 'd MMMM yyyy', 'fa-IR', 'persian')).toBe('۲۱ مهر ۱۴۰۵');
+    expect(formatDate(date, 'yyyy-MM-dd', 'en-US', 'persian')).toBe('1405-07-21');
+    expect(formatDate(new Date(2026, 2, 21), 'yyyy/M/d', 'en-US', 'persian')).toBe('1405/1/1');
+  });
+
+  it('uses the locale digits for numeric tokens, including time', () => {
+    expect(formatDate(date, 'HH:mm', 'fa-IR')).toBe('۱۴:۰۵');
+    expect(formatDate(date, 'HH:mm', 'en-US')).toBe('14:05');
+    expect(formatDate(date, 'yyyy-MM-dd', 'ar-EG')).toBe('٢٠٢٦-١٠-١٣');
+  });
+
+  it('applies the calendar of a value format and of the formatDate() expression function', () => {
+    expect(formatValue('2026-10-13', { type: 'date', pattern: 'yyyy/MM/dd', calendar: 'persian' }, 'en-US')).toBe('1405/07/21');
+    expect(formatValue('2026-10-13', { type: 'date', pattern: 'yyyy/MM/dd' }, 'en-US')).toBe('2026/10/13');
+  });
+});
+
+describe('calendar in templates and exports', () => {
+  it('validates the calendar of a date format', async () => {
+    const { validateTemplate } = await import('../../src');
+    const t = (calendar: unknown) => ({
+      schemaVersion: 1, name: 'x', unit: 'mm', page: { size: 'A4', orientation: 'portrait', margins: { top: 1, right: 1, bottom: 1, left: 1 } },
+      dataSources: [], body: [{ kind: 'band', id: 'b', height: 5, components: [{ id: 't', type: 'text', x: 0, y: 0, width: 10, height: 5, text: '{{ today() }}', format: { type: 'date', pattern: 'yyyy', calendar } }] }],
+    });
+    expect(validateTemplate(t('persian')).errors).toEqual([]);
+    expect(validateTemplate(t('martian')).errors.map((e) => e.path)).toContain('body[0].components[0].format.calendar');
+  });
+
+  it('exports non-Gregorian dates to Excel as the text shown in the report', async () => {
+    const { cellValue } = await import('../../src/export/excel');
+    const item = { kind: 'text', text: '1405/07/21', value: new Date(2026, 9, 13), format: { type: 'date', pattern: 'yyyy/MM/dd', calendar: 'persian' } } as never;
+    expect(cellValue(item, 'fa-IR')).toEqual({ value: '1405/07/21' });
+  });
+});

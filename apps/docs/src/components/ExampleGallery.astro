@@ -1,0 +1,58 @@
+---
+import { examples } from '../demos/data';
+---
+
+<div class="gallery not-content">
+  {
+    examples.map((e) => (
+      <div class="card">
+        <h3>{e.title}</h3>
+        <p>{e.description}</p>
+        <p>
+          {e.tags.map((t) => (
+            <span class="tag">{t}</span>
+          ))}
+        </p>
+        <div class="actions">
+          <a class="btn primary" href={`/playground/?example=${e.id}`}>
+            Open in playground
+          </a>
+          <a class="btn" href={`/examples/${e.id}.template.json`} download={`${e.id}.template.json`}>
+            Template
+          </a>
+          <a class="btn" href={`/examples/${e.id}.data.json`} download={`${e.id}.data.json`}>
+            Data
+          </a>
+        </div>
+      </div>
+    ))
+  }
+</div>
+
+<style>
+  .tag {
+    display: inline-block;
+    margin: 0 0.3rem 0.2rem 0;
+    padding: 0.05rem 0.5rem;
+    border-radius: 999px;
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+    font-size: var(--sl-text-xs);
+  }
+  .btn {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--sl-color-gray-4);
+    border-radius: 0.4rem;
+    color: var(--sl-color-white);
+    text-decoration: none;
+    font-size: var(--sl-text-sm);
+  }
+  .btn:hover {
+    border-color: var(--sl-color-accent);
+  }
+  .btn.primary {
+    background: var(--sl-color-accent);
+    border-color: var(--sl-color-accent);
+    color: var(--sl-color-black);
+  }
+</style>

@@ -1,0 +1,16 @@
+---
+title: Contributing
+description: How to build the project and send changes.
+---
+
+The source is at [github.com/Behnam1369/ariana-reports](https://github.com/Behnam1369/ariana-reports). Issues and pull requests are welcome.
+
+```bash
+corepack pnpm install
+corepack pnpm check              # build, typecheck and test every package
+corepack pnpm dev:react          # React demo app
+corepack pnpm dev:vue            # Vue demo app
+corepack pnpm --filter docs dev  # this website
+```
+
+Keep React and Vue in step: the same props, labels and behavior, with tests in both. New text for the interface goes into `packages/core/src/ui/labels.ts` and its Persian translation. Documentation examples must show both frameworks. See `CONTRIBUTING.md` in the repository for the full checklist.

@@ -24,4 +24,5 @@ export {
   type SnapOptions,
 } from './geometry';
 export { fieldExpression, inferFields, isIdentifier } from './infer';
-export { allRegions, convertTemplateUnit, designSections, findGroup, findRegion, type DesignSection } from './sections';
+export { DROP_TARGET_CLASS, marqueeTargets, snapshotBands, type BandHit } from './dom';
+export { allRegions, convertTemplateUnit, designSections, findGroup, findRegion, type DesignSection, type SectionLabels } from './sections';

@@ -1,5 +1,6 @@
 import { parseColor } from '../export/color';
 import { standardFamily } from '../layout/text';
+import { formatLabel } from '../ui/labels';
 import type {
   LayoutBand,
   LayoutDocument,
@@ -8,6 +9,7 @@ import type {
   LayoutLine,
   LayoutPage,
   LayoutText,
+  LayoutTextRun,
   ResolvedBorder,
   ResolvedStyle,
 } from '../layout/types';
@@ -32,6 +34,8 @@ export interface RenderOptions {
   ownerDocument?: Document;
   /** Decides whether an image src may be loaded. Defaults to `isSafeImageSrc`. */
   allowImageSrc?: (src: string) => boolean;
+  /** Accessible page name with `{page}` and `{count}` placeholders. Defaults to "Page {page} of {count}". */
+  pageLabel?: string;
 }
 
 /** CSS font stacks that match the PDF standard fonts used for measuring. */
@@ -95,6 +99,7 @@ class DomRenderer {
   private readonly d: Document;
   private readonly s: number;
   private readonly allow: (src: string) => boolean;
+  private readonly pageLabel: string;
 
   constructor(options: RenderOptions) {
     const d = options.ownerDocument ?? (typeof document !== 'undefined' ? document : undefined);
@@ -102,6 +107,7 @@ class DomRenderer {
     this.d = d;
     this.s = (options.scale ?? 1) * PX_PER_PT;
     this.allow = options.allowImageSrc ?? isSafeImageSrc;
+    this.pageLabel = options.pageLabel ?? 'Page {page} of {count}';
   }
 
   page(doc: LayoutDocument, page: LayoutPage): HTMLElement {
@@ -109,7 +115,7 @@ class DomRenderer {
     el.className = CSS.page;
     el.dataset.page = String(page.number);
     el.setAttribute('role', 'region');
-    el.setAttribute('aria-label', `Page ${page.number} of ${doc.pages.length}`);
+    el.setAttribute('aria-label', formatLabel(this.pageLabel, { page: page.number, count: doc.pages.length }));
     el.style.position = 'relative';
     el.style.overflow = 'hidden';
     el.style.width = pt(doc.pageWidth, this.s);
@@ -187,7 +193,8 @@ class DomRenderer {
     el.style.fontStyle = style.fontStyle;
     el.style.lineHeight = pt(item.lineHeight, this.s);
     el.style.color = cssColor(style.color) ?? 'transparent';
-    if (style.textDecoration !== 'none') el.style.textDecoration = style.textDecoration;
+    // With styled runs each span carries its own decoration (CSS decorations cannot be undone by children).
+    if (style.textDecoration !== 'none' && !item.runs) el.style.textDecoration = style.textDecoration;
     if (item.error) el.title = 'Expression error';
 
     // Lines are pre-wrapped by the engine; render one block per line so breaks match the PDF.
@@ -203,10 +210,30 @@ class DomRenderer {
         lineEl.style.textAlignLast = 'justify';
         lineEl.style.whiteSpace = 'pre-wrap';
       }
-      lineEl.textContent = line;
+      const runs = item.runs?.[i];
+      if (runs) {
+        // Styled runs are inserted as text nodes only: markup never becomes HTML.
+        for (const run of runs) lineEl.appendChild(this.run(run));
+      } else {
+        lineEl.textContent = line;
+      }
       el.appendChild(lineEl);
     });
     return el;
+  }
+
+  private run(run: LayoutTextRun): HTMLElement {
+    const span = this.d.createElement('span');
+    span.textContent = run.text;
+    span.style.fontWeight = run.bold ? 'bold' : 'normal';
+    span.style.fontStyle = run.italic ? 'italic' : 'normal';
+    const decorations = [run.underline && 'underline', run.strike && 'line-through'].filter(Boolean).join(' ');
+    if (decorations) span.style.textDecoration = decorations;
+    const color = cssColor(run.color);
+    span.style.color = color ?? 'transparent';
+    const bg = cssColor(run.backgroundColor);
+    if (bg) span.style.background = bg;
+    return span;
   }
 
   private image(item: LayoutImage): HTMLElement {

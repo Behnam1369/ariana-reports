@@ -1,0 +1,19 @@
+---
+title: Examples gallery
+description: Ready-made reports to open in the playground or download as JSON.
+---
+
+import ExampleGallery from '../../components/ExampleGallery.astro';
+
+Each example is a template and a data file. Open one in the [playground](/playground/) to see it, change it in the designer, or switch between React and Vue. Download the JSON to use it as a starting point in your own project.
+
+<ExampleGallery />
+
+## Using an example
+
+```tsx
+import template from './sales.template.json';
+import data from './sales.data.json';
+
+<ReportViewer template={template as ReportTemplate} data={data} />
+```

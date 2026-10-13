@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DesignerController, designScale, findBand, findComponent, type ReportTemplate } from '@ariana-report/core';
+import { DesignerController, designScale, findBand, findComponent, themeFromMui, type ReportTemplate } from '@ariana-reports/core';
 import { ReportDesigner, useDesigner } from '../src';
 import { salesData, salesTemplate } from './fixtures';
 
@@ -66,7 +66,78 @@ describe('ReportDesigner: surface', () => {
     expect(component('cust').querySelectorAll('.ar-handle')).toHaveLength(8);
     fireEvent.pointerDown(component('tot'), { button: 0, shiftKey: true });
     expect(controller.getState().selection.componentIds).toEqual(['cust', 'tot']);
-    expect(component('cust').querySelectorAll('.ar-handle')).toHaveLength(0);
+    // Every selected component shows its handles.
+    expect(component('cust').querySelectorAll('.ar-handle')).toHaveLength(8);
+    expect(component('tot').querySelectorAll('.ar-handle')).toHaveLength(8);
+  });
+
+  it('resizes every selected component with one handle', () => {
+    const { controller, component, comp } = setup();
+    act(() => controller.select(['cust', 'tot']));
+    drag(component('tot').querySelector('[data-handle="s"]')!, { x: 0, y: 0 }, { x: 0, y: 6 * SCALE });
+    expect(comp('cust')!.height).toBe(26);
+    expect(comp('tot')!.height).toBe(26);
+    act(() => controller.undo());
+    expect(comp('cust')!.height).toBe(20);
+    expect(comp('tot')!.height).toBe(20);
+  });
+
+  it('edits text in a dialog opened by double click', async () => {
+    const { controller, component, comp, user } = setup();
+    fireEvent.doubleClick(component('cust'));
+    const dialog = screen.getByRole('dialog', { name: 'Edit text' });
+    const area = within(dialog).getByLabelText('Text', { selector: 'textarea' }) as HTMLTextAreaElement;
+    expect(area.value).toBe('{{ row.customer }}');
+    expect(document.activeElement).toBe(area);
+    await user.clear(area);
+    await user.type(area, 'Name: ');
+    await user.click(within(dialog).getByRole('button', { name: 'row.customer' }));
+    expect(area.value).toBe('Name: {{ row.customer }}');
+    await new Promise((r) => setTimeout(r, 50)); // caret is restored after a frame
+    expect(area.selectionStart).toBe(area.value.length);
+    area.setSelectionRange(0, 4);
+    await user.click(within(dialog).getByRole('button', { name: 'Bold' }));
+    expect(area.value).toBe('<b>Name</b>: {{ row.customer }}');
+    expect((within(dialog).getByLabelText('Allow HTML tags') as HTMLInputElement).checked).toBe(true);
+    // Nothing changes until Apply; then it is one undo step.
+    expect(comp('cust')).toMatchObject({ text: '{{ row.customer }}' });
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(comp('cust')).toMatchObject({ text: '<b>Name</b>: {{ row.customer }}', allowHtml: true });
+    act(() => controller.undo());
+    expect(comp('cust')).toMatchObject({ text: '{{ row.customer }}' });
+  });
+
+  it('opens the text editor from the properties panel and cancels with Escape', async () => {
+    const { controller, comp, user } = setup();
+    act(() => controller.select(['cust']));
+    await user.click(screen.getByRole('button', { name: 'Open text editor' }));
+    const area = within(screen.getByRole('dialog')).getByLabelText('Text', { selector: 'textarea' });
+    await user.type(area, 'x{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(comp('cust')).toMatchObject({ text: '{{ row.customer }}' });
+  });
+
+  it('colors bands on the design surface and lets users change the color', async () => {
+    const { controller, container } = setup();
+    const section = () => container.querySelector('[data-section-band="detail"]') as HTMLElement;
+    expect(section().style.getPropertyValue('--ar-band-color')).toBe('');
+    act(() => controller.selectBand('detail'));
+    fireEvent.input(screen.getByLabelText('Band color'), { target: { value: '#ffcc00' } });
+    expect(findBand(controller.template, 'detail')!.band.designColor).toBe('#ffcc00');
+    expect(section().style.getPropertyValue('--ar-band-color')).toBe('#ffcc00');
+    // Light colors get dark caption text.
+    expect(section().style.getPropertyValue('--ar-band-caption-text')).toBe('#111827');
+  });
+
+  it('applies a theme as CSS variables, e.g. from a MUI theme', () => {
+    const mui = { palette: { mode: 'dark' as const, primary: { main: '#ff5722' }, background: { default: '#000', paper: '#111' }, divider: '#333' }, shape: { borderRadius: 8 } };
+    const { container } = setup(salesTemplate(), { theme: themeFromMui(mui) });
+    const root = container.querySelector('.ar-root') as HTMLElement;
+    expect(root.style.getPropertyValue('--ar-primary')).toBe('#ff5722');
+    expect(root.style.getPropertyValue('--ar-surface')).toBe('#111');
+    expect(root.style.getPropertyValue('--ar-radius')).toBe('8px');
+    expect(root.style.colorScheme).toBe('dark');
   });
 
   it('moves components by dragging as a single undo step', () => {
@@ -78,16 +149,88 @@ describe('ReportDesigner: surface', () => {
     expect(comp('cust')).toMatchObject({ x: 0, y: 0 });
   });
 
-  it('moves a component to another band when dropped over it', () => {
-    const { controller, component, band, comp } = setup();
-    const footer = band('ftr');
-    footer.getBoundingClientRect = () => ({ left: 0, top: 500, right: 400, bottom: 530, width: 400, height: 30, x: 0, y: 500, toJSON: () => ({}) });
-    document.elementFromPoint = vi.fn(() => footer);
-    drag(component('cust'), { x: 0, y: 0 }, { x: 10 * SCALE, y: 500 + 2 * SCALE });
+  /** jsdom has no layout: give the detail and footer sections fixed screen positions. */
+  function stubLayout(container: HTMLElement) {
+    const rect = (top: number, height: number) => () => ({ left: 0, top, right: 600, bottom: top + height, width: 600, height, x: 0, y: top, toJSON: () => ({}) });
+    const place = (id: string, top: number) => {
+      const section = container.querySelector(`[data-section-band="${id}"]`) as HTMLElement;
+      section.getBoundingClientRect = rect(top, 100);
+      (section.querySelector('[data-band-id]') as HTMLElement).getBoundingClientRect = rect(top + 22, 66);
+    };
+    place('rh', 0);
+    place('hdr', 100);
+    place('detail', 200);
+    place('ftr', 300);
+  }
+
+  it('moves a component to another band while dragging over it', () => {
+    const { controller, container, component, band, comp } = setup();
+    stubLayout(container);
+    fireEvent.pointerDown(component('cust'), { button: 0, clientX: 0, clientY: 222 });
+    fireEvent.pointerMove(window, { clientX: 10 * SCALE, clientY: 322 + 2 * SCALE });
     expect(findComponent(controller.template, 'cust')!.band.band.id).toBe('ftr');
+    expect(band('ftr').classList.contains('ar-band-drop')).toBe(true);
+    // Back over the original band: the component returns there.
+    fireEvent.pointerMove(window, { clientX: 10 * SCALE, clientY: 222 + 4 * SCALE });
+    expect(findComponent(controller.template, 'cust')!.band.band.id).toBe('detail');
+    fireEvent.pointerMove(window, { clientX: 10 * SCALE, clientY: 322 + 2 * SCALE });
+    fireEvent.pointerUp(window, { clientX: 10 * SCALE, clientY: 322 + 2 * SCALE });
     expect(comp('cust')).toMatchObject({ x: 10, y: 2 });
-    // @ts-expect-error cleanup of the jsdom stub
-    delete document.elementFromPoint;
+    expect(band('ftr').classList.contains('ar-band-drop')).toBe(false);
+    expect(controller.getState().selection).toEqual({ componentIds: ['cust'], bandId: 'ftr' });
+    // One undo step restores the original band and position.
+    act(() => controller.undo());
+    expect(findComponent(controller.template, 'cust')!.band.band.id).toBe('detail');
+    expect(comp('cust')).toMatchObject({ x: 0, y: 0 });
+  });
+
+  it('moves a multi-selection to another band', () => {
+    const { controller, container, component, comp } = setup();
+    stubLayout(container);
+    act(() => controller.select(['cust', 'tot']));
+    drag(component('cust'), { x: 0, y: 222 }, { x: 0, y: 322 + 5 * SCALE });
+    expect(findComponent(controller.template, 'cust')!.band.band.id).toBe('ftr');
+    expect(findComponent(controller.template, 'tot')!.band.band.id).toBe('ftr');
+    expect(comp('cust')).toMatchObject({ x: 0, y: 5 });
+    expect(comp('tot')).toMatchObject({ x: 180, y: 5 });
+  });
+
+  it('selects with a marquee started in the page margin', () => {
+    const { controller, container } = setup();
+    stubLayout(container);
+    const surface = container.querySelector('.ar-surface')!;
+    drag(surface, { x: -5, y: 215 }, { x: 300 * SCALE, y: 230 });
+    expect(controller.getState().selection).toEqual({ componentIds: ['cust', 'tot'], bandId: 'detail' });
+    fireEvent.pointerDown(surface, { button: 0, clientX: -5, clientY: 5 });
+    fireEvent.pointerUp(window, { clientX: -5, clientY: 5 });
+    expect(controller.getState().selection.componentIds).toEqual([]);
+  });
+
+  it('offers extra and registered PDF fonts in the font list', () => {
+    const { controller } = setup(salesTemplate(), { fonts: ['Vazirmatn'], preview: { pdf: { fonts: [{ family: 'Lato', data: new Uint8Array() }] } } });
+    act(() => controller.select(['cust']));
+    const options = Array.from((screen.getByLabelText('Font') as HTMLSelectElement).options).map((o) => o.value);
+    expect(options).toEqual(['', 'Helvetica', 'Times', 'Courier', 'Vazirmatn', 'Lato']);
+  });
+
+  it('selects with a marquee started in the empty strip below a band', () => {
+    const { controller, container } = setup();
+    const gap = container.querySelector('[data-band-gap="detail"]')!;
+    expect(gap).toBeTruthy();
+    drag(gap, { x: 0, y: 0 }, { x: 300 * SCALE, y: 10 * SCALE });
+    expect(controller.getState().selection).toEqual({ componentIds: ['cust', 'tot'], bandId: 'detail' });
+  });
+
+  it('shows the page margins around the bands', async () => {
+    const { container, controller, user } = setup();
+    const surface = container.querySelector('.ar-surface') as HTMLElement;
+    const m = controller.template.page.margins;
+    expect(container.querySelector('.ar-margin-guide')).toBeTruthy();
+    expect(surface.style.paddingLeft).toBe(`${m.left * SCALE}px`);
+    expect(parseFloat(surface.style.width)).toBeCloseTo(controller.pageSize().width * SCALE, 2);
+    await user.click(screen.getByRole('button', { name: 'Margins' }));
+    expect(container.querySelector('.ar-margin-guide')).toBeNull();
+    expect(parseFloat(surface.style.width)).toBeCloseTo(controller.bodyWidth() * SCALE, 2);
   });
 
   it('resizes with handles and bands with the bottom edge', () => {
@@ -149,6 +292,33 @@ describe('ReportDesigner: surface', () => {
     expect(comp('cust')).toBeDefined();
   });
 
+  it('previews allowHtml text as styled spans and toggles it in the properties', async () => {
+    const { controller, component, user } = setup();
+    act(() => controller.updateComponent('cust', { text: 'a <b>bold</b> <script>x</script>' } as never));
+    expect(component('cust').querySelector('b, script')).toBeNull();
+    act(() => controller.select(['cust']));
+    await user.click(screen.getByLabelText('Allow HTML tags'));
+    expect(findComponent(controller.template, 'cust')!.component).toMatchObject({ allowHtml: true });
+    const spans = Array.from(component('cust').querySelector('.ar-component-body')!.children) as HTMLElement[];
+    expect(spans.map((s) => s.textContent)).toEqual(['a ', 'bold', ' x']);
+    expect(spans[1]!.style.fontWeight).toBe('bold');
+    expect(component('cust').querySelector('script')).toBeNull();
+  });
+
+  it('translates the UI with uiLocale="fa"', () => {
+    const { container } = setup(salesTemplate(), { uiLocale: 'fa' });
+    expect(container.querySelector('.ar-root')!.getAttribute('dir')).toBe('rtl');
+    const captions = Array.from(container.querySelectorAll('.ar-section-caption')).map((c) => c.firstElementChild!.textContent);
+    expect(captions).toEqual(['سرصفحهٔ گزارش', 'سرستون: orders', 'جزئیات: orders', 'پاستون: orders']);
+    expect(screen.getByRole('button', { name: 'واگرد' })).toBeTruthy();
+    // Option values are translated, the stored value stays the same.
+    const orientation = screen.getByLabelText('جهت') as HTMLSelectElement;
+    expect(Array.from(orientation.options).map((o) => [o.value, o.text])).toEqual([
+      ['portrait', 'عمودی'],
+      ['landscape', 'افقی'],
+    ]);
+  });
+
   it('removes bands from their caption', async () => {
     const { controller, user } = setup();
     await user.click(screen.getByRole('button', { name: 'Remove band: Footer: orders' }));
@@ -167,12 +337,20 @@ describe('ReportDesigner: toolbar', () => {
     expect(comp('cust')!.x).toBe(50);
   });
 
-  it('aligns, reorders and deletes the selection', async () => {
+  it('aligns the content of the selected texts, reorders and deletes', async () => {
     const { controller, user, comp } = setup();
     expect((screen.getByRole('button', { name: 'Align left' }) as HTMLButtonElement).disabled).toBe(true);
     act(() => controller.select(['cust', 'tot']));
+    // Default alignment is left/top.
+    expect(screen.getByRole('button', { name: 'Align left' }).getAttribute('aria-pressed')).toBe('true');
     await user.click(screen.getByRole('button', { name: 'Align right' }));
-    expect(comp('cust')!.x).toBe(180);
+    expect(comp('cust')).toMatchObject({ x: 0, style: { textAlign: 'right' } });
+    expect(comp('tot')).toMatchObject({ x: 180, style: { textAlign: 'right' } });
+    expect(screen.getByRole('button', { name: 'Align right' }).getAttribute('aria-pressed')).toBe('true');
+    await user.click(screen.getByRole('button', { name: 'Align bottom' }));
+    expect(comp('cust')!.style).toMatchObject({ textAlign: 'right', verticalAlign: 'bottom' });
+    await user.click(screen.getByRole('button', { name: 'Justify' }));
+    expect(comp('tot')!.style).toMatchObject({ textAlign: 'justify' });
     await user.click(screen.getByRole('button', { name: 'Send to back' }));
     await user.click(screen.getByRole('button', { name: 'Delete', exact: true } as never));
     expect(comp('cust')).toBeUndefined();

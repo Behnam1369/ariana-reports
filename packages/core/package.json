@@ -1,8 +1,18 @@
 {
-  "name": "@ariana-report/core",
+  "name": "@ariana-reports/core",
   "version": "0.1.0",
   "description": "Framework-agnostic banded reporting engine: JSON templates, JSON data, safe JavaScript expressions, PDF and Excel export.",
   "license": "MIT",
+  "author": "Behnam Aghaali",
+  "homepage": "https://ariana-reports.netlify.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Behnam1369/ariana-reports.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/Behnam1369/ariana-reports/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -10,9 +20,14 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
@@ -28,12 +43,20 @@
     "report-viewer",
     "banded-report",
     "pdf",
-    "excel"
+    "excel",
+    "report-generator",
+    "report-builder",
+    "pdf-report",
+    "excel-export",
+    "rtl",
+    "persian",
+    "typescript"
   ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepublishOnly": "node ../../scripts/check-publish.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",
@@ -47,5 +70,11 @@
     "tsup": "8.5.1",
     "typescript": "5.9.3",
     "vitest": "5.0.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

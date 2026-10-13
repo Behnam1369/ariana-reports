@@ -1,0 +1,87 @@
+---
+title: Languages and locales
+description: Translate the interface, format numbers and dates per locale, and use right-to-left layouts.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Demo from '../../../components/Demo.astro';
+
+Two settings are easy to mix up:
+
+| | `locale` | `uiLocale` |
+| --- | --- | --- |
+| What | How **report content** is formatted: separators, currencies, month names, digits, calendars | The language of the **user interface**: toolbar, panels, dialogs, messages |
+| Where | The template's `locale`, or the viewer's `locale` prop | The viewer's and designer's `uiLocale` prop |
+| Example | `fa-IR` | `fa` |
+
+They are independent. A German report can be shown in an English interface, and the other way round.
+
+## Translating the interface
+
+English is the default. Persian (Farsi) is built in and also switches the interface to right-to-left:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    <ReportViewer uiLocale="fa" template={template} data={data} />
+    <ReportDesigner uiLocale="fa" template={template} sampleData={data} />
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <ReportViewer ui-locale="fa" :template="template" :data="data" />
+    <ReportDesigner ui-locale="fa" :template="template" :sample-data="data" />
+    ```
+  </TabItem>
+</Tabs>
+
+<Demo name="designer-persian" example="persian" height={640} />
+
+The designer, the viewer, the text editor dialog, the section captions on the design surface and the values in drop-downs (such as *portrait*, *bold* or *Persian calendar*) are all translated. Arrow icons mirror in right-to-left. The report pages and the design surface keep the template's own layout, left to right.
+
+## Adding a language
+
+A language is a plain object. Register it once, then use it by code. Missing labels fall back to English:
+
+```ts
+import { registerUiLocale, type UiLocale } from '@ariana-reports/core';
+
+const de: UiLocale = {
+  code: 'de',
+  dir: 'ltr',
+  labels: {
+    print: 'Drucken',
+    nextPage: 'Nächste Seite',
+    previousPage: 'Vorherige Seite',
+    // … see DEFAULT_LABELS for every key
+  },
+  values: { bold: 'fett', portrait: 'Hochformat' }, // option values shown in drop-downs
+};
+
+registerUiLocale(de);
+// <ReportViewer uiLocale="de" … />
+```
+
+You can also pass the object itself: `uiLocale={de}`. Region codes such as `de-CH` match the registered language. `DEFAULT_LABELS` lists every label with its English text; `{name}` placeholders are filled in, as in `Page {page} of {count}`.
+
+To change a few labels in one language, use `labels`. Overrides win over the language:
+
+```tsx
+<ReportViewer uiLocale="fa" labels={{ print: 'چاپ گزارش' }} … />
+```
+
+## Formatting content
+
+Set `locale` in the template, or on the viewer to override it:
+
+```json
+{ "locale": "fa-IR", … }
+```
+
+The locale decides digits (۱۲۳ for `fa-IR`, ١٢٣ for `ar-EG`), separators, currency symbols and month names. Dates can also use another **calendar**, such as the Persian one. See [Formatting values](/guides/formatting/).
+
+## Right-to-left text in reports
+
+Text in Arabic-script languages displays correctly in the viewer, because the browser shapes it. Set `textAlign: "right"` for those cells. Text layout inside PDFs does not support shaping or right-to-left reordering yet; see [Known limitations](/project/limitations/).
+
+<Demo name="viewer-persian" example="persian" height={420} />

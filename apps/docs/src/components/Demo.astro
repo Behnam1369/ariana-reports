@@ -1,0 +1,73 @@
+---
+/**
+ * A live demo with its source code in React and Vue tabs (synced across the whole site).
+ * The code shown is the file that runs, so docs and demos cannot drift apart.
+ *
+ *   <Demo name="viewer-grouping" example="sales" height={520} />
+ */
+import { Code, TabItem, Tabs } from '@astrojs/starlight/components';
+import { exampleById } from '../demos/data';
+import ReactDemo from './ReactDemo.tsx';
+import VueDemo from './VueDemo.vue';
+
+interface Props {
+  name: string;
+  /** Id of the example whose template and data are shown in extra tabs. */
+  example?: string;
+  height?: number;
+}
+const { name, example, height = 460 } = Astro.props;
+
+const reactSources = import.meta.glob('../demos/react/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+const vueSources = import.meta.glob('../demos/vue/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+// The demos import their sample data from a shared file; show it as a file next to the component.
+const clean = (source: string) => source.replace("'../data'", "'./report-data'").trim();
+const react = clean(reactSources[`../demos/react/${name}.tsx`] ?? '');
+const vue = clean(vueSources[`../demos/vue/${name}.vue`] ?? '');
+if (!react || !vue) throw new Error(`Demo "${name}" needs both demos/react/${name}.tsx and demos/vue/${name}.vue`);
+
+const ex = example ? exampleById(example) : undefined;
+const templateJson = ex ? JSON.stringify(ex.template, null, 2) : '';
+// Long data sets are cut so the page stays readable.
+const trim = (value: unknown): { json: string; note: string } => {
+  const data = structuredClone(value) as Record<string, unknown>;
+  let note = '';
+  for (const [key, rows] of Object.entries(data)) {
+    if (Array.isArray(rows) && rows.length > 6) {
+      note = `${key}: first 6 of ${rows.length} rows`;
+      data[key] = rows.slice(0, 6);
+    }
+  }
+  return { json: JSON.stringify(data, null, 2), note };
+};
+const dataView = ex ? trim(ex.data) : undefined;
+---
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    <div class="demo not-content">
+      <div class="demo-stage" style={`height:${height}px`}>
+        <ReactDemo client:only="react" name={name} />
+      </div>
+    </div>
+    <Code code={react} lang="tsx" title={`${name}.tsx`} />
+  </TabItem>
+  <TabItem label="Vue">
+    <div class="demo not-content">
+      <div class="demo-stage" style={`height:${height}px`}>
+        <VueDemo client:only="vue" name={name} />
+      </div>
+    </div>
+    <Code code={vue} lang="vue" title={`${name}.vue`} />
+  </TabItem>
+  {ex && (
+    <TabItem label="Template JSON">
+      <Code code={templateJson} lang="json" title={`${ex.id}.template.json`} />
+    </TabItem>
+  )}
+  {dataView && (
+    <TabItem label="Data JSON">
+      <Code code={dataView.json} lang="json" title={`${ex!.id}.data.json${dataView.note ? ` (${dataView.note})` : ''}`} />
+    </TabItem>
+  )}
+</Tabs>

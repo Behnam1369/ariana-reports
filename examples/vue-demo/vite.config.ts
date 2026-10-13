@@ -9,8 +9,8 @@ export default defineConfig({
   resolve: {
     // Use the package sources directly so the demo works without building the packages first.
     alias: {
-      '@ariana-report/vue': src('../../packages/vue/src/index.ts'),
-      '@ariana-report/core': src('../../packages/core/src/index.ts'),
+      '@ariana-reports/vue': src('../../packages/vue/src/index.ts'),
+      '@ariana-reports/core': src('../../packages/core/src/index.ts'),
     },
   },
 });

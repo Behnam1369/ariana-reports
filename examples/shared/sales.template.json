@@ -56,7 +56,7 @@
     "height": 22,
     "components": [
       { "id": "title", "type": "text", "x": 0, "y": 0, "width": 120, "height": 10, "styleName": "title", "text": "{{ params.title }}" },
-      { "id": "company", "type": "text", "x": 0, "y": 11, "width": 120, "height": 5, "styleName": "muted", "text": "{{ company[0].name }}, {{ company[0].city }}" },
+      { "id": "company", "type": "text", "x": 0, "y": 11, "width": 120, "height": 5, "styleName": "muted", "allowHtml": true, "text": "<b>{{ company[0].name }}</b>, <i>{{ company[0].city }}</i>" },
       {
         "id": "printed",
         "type": "text",

@@ -10,17 +10,35 @@
   "scripts": {
     "build": "corepack pnpm -r --filter \"./packages/**\" build",
     "test": "corepack pnpm -r --filter \"./packages/**\" test",
-    "typecheck": "corepack pnpm --filter @ariana-report/core build && corepack pnpm -r typecheck",
+    "typecheck": "corepack pnpm --filter @ariana-reports/core build && corepack pnpm -r typecheck",
     "check": "corepack pnpm build && corepack pnpm typecheck && corepack pnpm test",
     "dev:react": "corepack pnpm --filter react-demo dev",
-    "dev:vue": "corepack pnpm --filter vue-demo dev"
+    "dev:vue": "corepack pnpm --filter vue-demo dev",
+    "lint:package": "corepack pnpm -r --filter \"./packages/**\" exec publint --pack npm && corepack pnpm -r --filter \"./packages/**\" exec attw --pack . --profile node16",
+    "size": "node scripts/check-size.mjs",
+    "version-packages": "changeset version && node scripts/sync-version.mjs",
+    "release": "corepack pnpm build && changeset publish",
+    "configure": "node scripts/configure.mjs",
+    "verify": "corepack pnpm check && corepack pnpm lint:package && corepack pnpm size"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@changesets/cli": "3.0.3",
     "@types/node": "22.20.4",
     "jsdom": "30.1.1",
+    "publint": "0.3.25",
     "tsup": "8.5.1",
     "typescript": "5.9.3",
     "vite": "8.3.2",
     "vitest": "5.0.3"
-  }
+  },
+  "author": "Behnam Aghaali",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Behnam1369/ariana-reports.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Behnam1369/ariana-reports/issues"
+  },
+  "homepage": "https://ariana-reports.netlify.app"
 }

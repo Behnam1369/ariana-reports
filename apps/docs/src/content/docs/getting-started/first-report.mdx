@@ -1,0 +1,107 @@
+---
+title: Your first report
+description: Show a report from a template and data in React or Vue.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Demo from '../../../components/Demo.astro';
+
+## 1. Write a template and some data
+
+Save a template as `sales.template.json` and your data as `sales.data.json`. The [examples gallery](/examples/) has complete files to start from. A small template looks like this:
+
+```json title="sales.template.json"
+{
+  "schemaVersion": 1,
+  "name": "Sales",
+  "unit": "mm",
+  "page": { "size": "A4", "orientation": "portrait", "margins": { "top": 12, "right": 12, "bottom": 12, "left": 12 } },
+  "dataSources": [{ "name": "orders" }],
+  "reportHeader": {
+    "id": "rh", "height": 14,
+    "components": [
+      { "id": "title", "type": "text", "x": 0, "y": 0, "width": 186, "height": 10,
+        "style": { "fontSize": 18, "fontWeight": "bold" }, "text": "{{ params.title }}" }
+    ]
+  },
+  "parameters": [{ "name": "title", "type": "string", "defaultValue": "Sales" }],
+  "body": [{
+    "kind": "dataRegion", "id": "list", "dataSource": "orders",
+    "detail": { "id": "row", "height": 7, "components": [
+      { "id": "customer", "type": "text", "x": 0, "y": 0, "width": 120, "height": 7, "text": "{{ row.customer }}" },
+      { "id": "total", "type": "text", "x": 120, "y": 0, "width": 66, "height": 7,
+        "style": { "textAlign": "right" }, "format": { "type": "currency", "currency": "USD" }, "text": "{{ row.total }}" }
+    ]}
+  }]
+}
+```
+
+```json title="sales.data.json"
+{ "orders": [{ "customer": "Contoso", "total": 1200 }, { "customer": "Fabrikam", "total": 89.5 }] }
+```
+
+## 2. Show it
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx title="SalesReport.tsx"
+    import { ReportViewer, type ReportTemplate } from '@ariana-reports/react';
+    import template from './sales.template.json';
+    import data from './sales.data.json';
+
+    export function SalesReport() {
+      return (
+        <div style={{ height: 600 }}>
+          <ReportViewer
+            template={template as ReportTemplate}
+            data={data}
+            params={{ title: 'Q1 sales' }}
+            onError={(error) => console.error(error)}
+          />
+        </div>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue title="SalesReport.vue"
+    <script setup lang="ts">
+    import { ReportViewer, type ReportTemplate } from '@ariana-reports/vue';
+    import template from './sales.template.json';
+    import data from './sales.data.json';
+
+    const typed = template as ReportTemplate;
+    </script>
+
+    <template>
+      <div style="height: 600px">
+        <ReportViewer
+          :template="typed"
+          :data="data"
+          :params="{ title: 'Q1 sales' }"
+          @error="(error) => console.error(error)"
+        />
+      </div>
+    </template>
+    ```
+  </TabItem>
+</Tabs>
+
+That is the whole integration. The viewer generates the report, shows every page in a scrollable column, and adds zoom, print, **PDF** and **Excel** buttons.
+
+## What you get
+
+<Demo name="viewer-basic" example="products" height={520} />
+
+- Scroll through the pages. The page number follows the scroll position, and the toolbar buttons jump to a page.
+- Change the zoom, or choose *Fit width* / *Fit page*.
+- Use **PDF** or **Excel** to download the report.
+- Problems in the template (such as an expression that fails) appear in the *Issues* panel. The rest of the report still renders.
+
+## Things to know
+
+- `template` can be an object or a JSON string. The report regenerates when `template`, `data` or `params` change by reference, so keep them stable (module constants, `useMemo`, or `ref`).
+- Invalid templates do not throw; the viewer shows the validation error and calls `onError`.
+- To generate the report yourself (for instance on a server), use `generateReport(template, data)`. See [Without a framework](/guides/viewer/#without-a-framework).
+
+Next: [build a template visually with the designer](/getting-started/first-designer/).

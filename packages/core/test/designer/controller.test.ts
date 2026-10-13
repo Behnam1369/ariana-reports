@@ -611,3 +611,48 @@ describe('keyboard shortcuts', () => {
     expect(comp(c, 'd_total').x).toBe(150);
   });
 });
+
+describe('moving components between bands', () => {
+  it('moves a multi-selection into another band during one interaction', () => {
+    const c = make();
+    c.select(['d_id', 'd_total']);
+    c.beginInteraction('Move');
+    c.moveComponentsToBand(['d_id', 'd_total'], 'orders_footer', 2, 1);
+    expect(band(c, 'orders_footer').components.map((x) => x.id)).toEqual(['grand_total', 'd_id', 'd_total']);
+    expect(band(c, 'order_detail').components).toEqual([]);
+    expect(comp(c, 'd_id')).toMatchObject({ x: 2, y: 1 });
+    expect(comp(c, 'd_total')).toMatchObject({ x: 152, y: 1 });
+    expect(c.getState().selection).toEqual({ componentIds: ['d_id', 'd_total'], bandId: 'orders_footer' });
+    // Back to the source band: the move is relative to the drag start.
+    c.moveComponentsToBand(['d_id', 'd_total'], 'order_detail', 1, 0);
+    expect(band(c, 'order_detail').components.map((x) => x.id)).toEqual(['d_id', 'd_total']);
+    expect(band(c, 'orders_footer').components.map((x) => x.id)).toEqual(['grand_total']);
+    expect(comp(c, 'd_id')).toMatchObject({ x: 1, y: 0 });
+    c.moveComponentsToBand(['d_id', 'd_total'], 'orders_footer', 0, 5);
+    c.endInteraction();
+    expect(findComponent(c.template, 'd_id')!.band.band.id).toBe('orders_footer');
+    // Grows the target band to fit and keeps positions non-negative.
+    expect(band(c, 'orders_footer').height).toBe(12);
+    c.undo();
+    expect(findComponent(c.template, 'd_id')!.band.band.id).toBe('order_detail');
+    expect(c.getState().canUndo).toBe(false);
+  });
+
+  it('clamps the group to the band origin and ignores unknown bands', () => {
+    const c = make();
+    c.moveComponentsToBand(['d_id', 'd_total'], 'orders_footer', -50, -50);
+    expect(comp(c, 'd_id')).toMatchObject({ x: 0, y: 0 });
+    expect(comp(c, 'd_total')).toMatchObject({ x: 150, y: 0 });
+    const before = c.template;
+    c.moveComponentsToBand(['d_id'], 'nope', 1, 1);
+    expect(c.template).toBe(before);
+  });
+
+  it('exposes the page size and a showMargins setting', () => {
+    const c = make();
+    expect(c.getState().settings.showMargins).toBe(true);
+    const size = c.pageSize();
+    const m = c.template.page.margins;
+    expect(c.bodyWidth()).toBeCloseTo(size.width - m.left - m.right, 3);
+  });
+});

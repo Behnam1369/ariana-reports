@@ -1,7 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp, defineComponent, h, nextTick, toRaw } from 'vue';
-import { generateReport, STYLE_ELEMENT_ID, ViewerController } from '@ariana-report/core';
+import { generateReport, STYLE_ELEMENT_ID, ViewerController } from '@ariana-reports/core';
 import { ArianaReport, ReportViewer, useViewer } from '../src';
 import { salesData, salesTemplate } from './fixtures';
 
@@ -21,8 +21,43 @@ const button = (w: VueWrapper, name: string) => w.get(`button[aria-label="${name
 const pageInput = (w: VueWrapper) => w.get('input[aria-label="Page number"]').element as HTMLInputElement;
 
 describe('ReportViewer (Vue)', () => {
-  it('generates, shows the first page and emits generated', async () => {
+  it('shows every page in one scrollable column by default', async () => {
     const w = mountViewer();
+    await nextTick();
+    const pages = (w.emitted('generated')![0]![0] as { pages: unknown[] }).pages.length;
+    expect(w.findAll('.ar-pages > .ar-page-slot')).toHaveLength(pages);
+    expect(w.findAll('.ar-page')).toHaveLength(pages);
+    expect(texts(w)).toContain('Litware');
+  });
+
+  it('updates the page number while scrolling', async () => {
+    const w = mountViewer();
+    await nextTick();
+    const scroller = w.get('.ar-viewer-scroll').element as HTMLElement;
+    const slots = w.findAll('.ar-page-slot').map((s) => s.element as HTMLElement);
+    const rect = (top: number, height: number) => () => ({ left: 0, top, right: 400, bottom: top + height, width: 400, height, x: 0, y: top, toJSON: () => ({}) });
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 400 });
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 5000 });
+    scroller.getBoundingClientRect = rect(0, 400);
+    slots.forEach((slot, i) => (slot.getBoundingClientRect = () => rect(i * 300 - scroller.scrollTop, 300)()));
+    scroller.scrollTop = 310;
+    scroller.dispatchEvent(new Event('scroll'));
+    await vi.waitFor(() => expect(pageInput(w).value).toBe('2'));
+    await button(w, 'First page').trigger('click');
+    await nextTick();
+    expect(scroller.scrollTop).toBe(0);
+  });
+
+  it('translates the toolbar with uiLocale="fa"', async () => {
+    const w = mountViewer({ uiLocale: 'fa' });
+    await nextTick();
+    expect(w.get('.ar-root').attributes('dir')).toBe('rtl');
+    expect(w.find('button[aria-label="صفحهٔ بعد"]').exists()).toBe(true);
+    expect(w.get('.ar-page').attributes('aria-label')).toMatch(/^صفحهٔ 1 از/);
+  });
+
+  it('generates, shows the first page and emits generated', async () => {
+    const w = mountViewer({ viewMode: 'single' });
     await nextTick();
     const generated = w.emitted('generated')!;
     expect(generated).toHaveLength(1);

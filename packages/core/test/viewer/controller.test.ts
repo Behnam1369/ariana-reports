@@ -5,6 +5,7 @@ import {
   clampZoom,
   CSS,
   fitZoom,
+  FIT_PADDING,
   generateReport,
   MAX_ZOOM,
   MIN_ZOOM,
@@ -41,9 +42,9 @@ describe('zoom helpers', () => {
 
   it('fits width or the whole page', () => {
     const doc = { pageWidth: 600, pageHeight: 800 };
-    const width = 600 * PX_PER_PT + 32;
+    const width = 600 * PX_PER_PT + FIT_PADDING;
     expect(fitZoom(doc, { width, height: 10_000 }, 'fitWidth')).toBeCloseTo(1, 6);
-    expect(fitZoom(doc, { width, height: 400 * PX_PER_PT + 32 }, 'fitPage')).toBeCloseTo(0.5, 6);
+    expect(fitZoom(doc, { width, height: 400 * PX_PER_PT + FIT_PADDING }, 'fitPage')).toBeCloseTo(0.5, 6);
     expect(fitZoom(doc, { width: 0, height: 0 }, 'fitPage')).toBe(MIN_ZOOM);
   });
 });
@@ -131,10 +132,10 @@ describe('ViewerController', () => {
   it('follows the container in fit modes and leaves them on manual zoom', () => {
     const c = new ViewerController({ zoomMode: 'fitWidth' });
     c.load(template(), data(1));
-    c.setContainerSize(200 * PX_PER_PT * 2 + 32, 500);
+    c.setContainerSize(200 * PX_PER_PT * 2 + FIT_PADDING, 500);
     expect(c.getState().zoom).toBeCloseTo(2, 6);
     c.setZoomMode('fitPage');
-    expect(c.getState().zoom).toBeCloseTo((500 - 32) / (300 * PX_PER_PT), 6);
+    expect(c.getState().zoom).toBeCloseTo((500 - FIT_PADDING) / (300 * PX_PER_PT), 6);
     c.zoomIn();
     expect(c.getState().zoomMode).toBe('custom');
     const zoom = c.getState().zoom;

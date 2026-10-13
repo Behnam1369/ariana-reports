@@ -1,0 +1,39 @@
+---
+title: HTML formatting in text
+description: Use bold, italic, colors and line breaks inside a single text, safely.
+---
+
+import Demo from '../../../components/Demo.astro';
+
+Set `"allowHtml": true` on a text component to use a small set of formatting tags. The tags are read **after** the `{{ }}` placeholders are filled in, so values from your data may contain them too.
+
+| Tags | Effect |
+| --- | --- |
+| `<b>`, `<strong>` | bold |
+| `<i>`, `<em>` | italic |
+| `<u>`, `<ins>` | underline |
+| `<s>`, `<strike>`, `<del>` | line-through |
+| `<br>` | line break |
+| `<font color="red">` | text color (named, `#hex`, `rgb()`) |
+| `<span style="…">` | `color`, `background-color`, `font-weight`, `font-style`, `text-decoration` |
+
+```json
+{ "id": "note", "type": "text", "allowHtml": true, "canGrow": true,
+  "text": "Total: <b>{{ row.total }}</b><br><font color=\"#b91c1c\">overdue</font>" }
+```
+
+Entities (`&amp;`, `&lt;`, `&nbsp;`, `&#…;`) are decoded.
+
+<Demo name="viewer-html" example="notes" height={480} />
+
+## Why it is safe
+
+This is not an HTML renderer. The markup is parsed into **styled text runs**, and only a fixed list of tags is understood. Every other tag (`<script>`, `<img>`, `<a>`, `<iframe>` and so on) is removed together with its attributes, and only its text stays. The viewer creates text nodes and sets a few validated style properties; it never assigns HTML. Colors are validated, so `url(...)` or `expression(...)` values are dropped. Hostile markup in a template or in your data cannot add scripts, links, images or event handlers.
+
+The same runs are used everywhere, so the formatting is identical on screen, in the PDF (a bold or italic font per run) and in Excel (rich text cells), and line wrapping measures each run with its own font.
+
+## Tips
+
+- Text with `allowHtml` wraps and aligns like any other text, including `justify`.
+- Use `canGrow` when `<br>` or long values make the text taller than its box.
+- In the designer, tick *Allow HTML tags* in the text properties. The large text editor has buttons that wrap the selection in `<b>`, `<i>`, `<u>` and `<s>`.

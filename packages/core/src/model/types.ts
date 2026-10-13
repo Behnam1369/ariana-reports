@@ -177,10 +177,19 @@ export interface PercentFormat {
   decimals?: number;
 }
 
+export const CALENDARS = ['gregory', 'persian', 'islamic', 'islamic-umalqura', 'hebrew', 'buddhist', 'japanese', 'roc'] as const;
+export type Calendar = (typeof CALENDARS)[number];
+
 export interface DateFormat {
   type: 'date';
   /** Pattern such as "yyyy-MM-dd" or "dd/MM/yyyy HH:mm". */
   pattern: string;
+  /**
+   * Calendar used for the year, month and day tokens. Defaults to the Gregorian
+   * calendar. `persian` writes Jalali dates, e.g. 1405/07/21. Month names follow
+   * the report locale. Excel exports such dates as text.
+   */
+  calendar?: Calendar;
 }
 
 export type ValueFormat = NumberFormat | CurrencyFormat | PercentFormat | DateFormat;
@@ -227,6 +236,12 @@ export interface TextComponent extends ComponentBase {
   canGrow?: boolean;
   /** Wrap long lines. Defaults to true. */
   wordWrap?: boolean;
+  /**
+   * Interpret a safe subset of HTML formatting tags in the text (after
+   * interpolation): <b>, <i>, <u>, <s>, <br>, <font color>, <span style>.
+   * Other tags are removed; markup is never inserted as HTML. Defaults to false.
+   */
+  allowHtml?: boolean;
 }
 
 export const IMAGE_FITS = ['contain', 'cover', 'fill', 'none'] as const;
@@ -284,6 +299,11 @@ export interface Band {
   printOnFirstPage?: boolean;
   /** Page header/footer only. Defaults to true. */
   printOnLastPage?: boolean;
+  /**
+   * Color of the band's caption on the design surface (the band area uses a
+   * lighter tint). Design time only: it does not affect the report.
+   */
+  designColor?: string;
 }
 
 export const SORT_DIRECTIONS = ['asc', 'desc'] as const;

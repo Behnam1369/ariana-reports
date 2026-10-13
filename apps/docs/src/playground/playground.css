@@ -1,0 +1,199 @@
+/* Playground chrome. Colors follow the site theme (data-theme on <html>). */
+.pg {
+  --pg-bg: #ffffff;
+  --pg-panel: #f6f8fa;
+  --pg-border: #d8dee4;
+  --pg-text: #1f2328;
+  --pg-muted: #59636e;
+  --pg-accent: #1565c0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--pg-bg);
+  color: var(--pg-text);
+  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+:root[data-theme='dark'] .pg {
+  --pg-bg: #0d1117;
+  --pg-panel: #161b22;
+  --pg-border: #30363d;
+  --pg-text: #e6edf3;
+  --pg-muted: #9198a1;
+  --pg-accent: #58a6ff;
+}
+.pg * {
+  box-sizing: border-box;
+}
+.pg-bar,
+.pg-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--pg-panel);
+  border-bottom: 1px solid var(--pg-border);
+}
+.pg-tabs {
+  padding: 0 14px;
+  gap: 2px;
+  background: var(--pg-bg);
+}
+.pg-brand {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--pg-accent);
+  text-decoration: none;
+  margin-inline-end: 6px;
+}
+.pg-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pg-muted);
+}
+.pg-bar select,
+.pg-bar button,
+.pg-tabs button,
+.pg-editor-bar button,
+.pg-link {
+  font: inherit;
+  color: var(--pg-text);
+  background: var(--pg-bg);
+  border: 1px solid var(--pg-border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.pg-bar select {
+  max-width: 220px;
+}
+.pg-bar button:hover,
+.pg-tabs button:hover,
+.pg-editor-bar button:hover,
+.pg-link:hover {
+  border-color: var(--pg-accent);
+}
+.pg :focus-visible {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: 1px;
+}
+.pg-link {
+  text-decoration: none;
+}
+.pg-primary {
+  background: var(--pg-accent) !important;
+  border-color: var(--pg-accent) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+:root[data-theme='dark'] .pg-primary {
+  color: #0d1117 !important;
+}
+.pg-spacer {
+  flex: 1;
+}
+.pg-seg {
+  display: inline-flex;
+}
+.pg-bar .pg-seg button {
+  border-radius: 0;
+}
+.pg-seg button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.pg-seg button:last-child {
+  border-radius: 0 6px 6px 0;
+  margin-inline-start: -1px;
+}
+.pg-seg button[aria-pressed='true'] {
+  background: var(--pg-accent);
+  border-color: var(--pg-accent);
+  color: #fff;
+  position: relative;
+}
+:root[data-theme='dark'] .pg-seg button[aria-pressed='true'] {
+  color: #0d1117;
+}
+.pg-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  padding: 9px 14px;
+  color: var(--pg-muted);
+}
+.pg-tabs button[aria-selected='true'] {
+  color: var(--pg-text);
+  border-bottom-color: var(--pg-accent);
+  font-weight: 600;
+}
+.pg-note {
+  color: var(--pg-muted);
+  font-size: 12px;
+}
+.pg-stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.pg-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.pg-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  color: var(--pg-muted);
+  border-bottom: 1px solid var(--pg-border);
+  background: var(--pg-panel);
+}
+.pg-editor textarea,
+.pg-code {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  margin: 0;
+  padding: 14px;
+  border: 0;
+  resize: none;
+  background: var(--pg-bg);
+  color: var(--pg-text);
+  font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  tab-size: 2;
+  outline: none;
+}
+.pg-code {
+  overflow: auto;
+  white-space: pre;
+}
+.pg-errors {
+  margin: 0;
+  padding: 8px 14px 8px 30px;
+  max-height: 30%;
+  overflow: auto;
+  color: #cf222e;
+  background: color-mix(in srgb, #cf222e 8%, var(--pg-bg));
+  border-top: 1px solid var(--pg-border);
+  font-size: 12.5px;
+}
+:root[data-theme='dark'] .pg-errors {
+  color: #ff7b72;
+}
+.pg-toast {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 20px;
+  width: fit-content;
+  max-width: calc(100vw - 32px);
+  margin-inline: auto;
+  padding: 9px 16px;
+  border-radius: 8px;
+  background: #1f2328;
+  color: #fff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  z-index: 2000;
+}

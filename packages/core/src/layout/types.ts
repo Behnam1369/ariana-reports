@@ -10,6 +10,9 @@ import type {
   VerticalAlign,
 } from '../model/types';
 import type { BandRole } from '../model/walk';
+import type { LayoutTextRun } from './html';
+
+export type { LayoutTextRun } from './html';
 
 /**
  * The layout document is the engine's output and the single input of every
@@ -109,6 +112,13 @@ export interface LayoutText extends LayoutItemBase {
   format?: ValueFormat;
   /** True when an expression failed and the text shows an error marker. */
   error?: boolean;
+  /**
+   * Styled runs per wrapped line, present when the component has
+   * `allowHtml`. `lines[i]` is the plain text of `runs[i]`.
+   */
+  runs?: LayoutTextRun[][];
+  /** The unwrapped styled runs of `text` (with `allowHtml`), e.g. for Excel rich text. */
+  richText?: LayoutTextRun[];
 }
 
 export interface LayoutImage extends LayoutItemBase {

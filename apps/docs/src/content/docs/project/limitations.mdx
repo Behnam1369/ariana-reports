@@ -1,0 +1,37 @@
+---
+title: Known limitations
+description: What does not work yet.
+---
+
+ariana-report is young. These are the limits to know about before you build on it.
+
+## Arabic-script text in PDF files
+
+Persian, Arabic and Urdu text displays correctly **on screen**, where the browser shapes and reorders it. In **PDF files** it does not yet: the PDF writer draws each character in logical order without contextual joining and without right-to-left reordering, so the letters look disconnected and the order of mixed text can be wrong. Embedding a font (see [Fonts](/guides/fonts/)) fixes missing glyphs but not the shaping.
+
+The interface, numbers, currencies and dates (including the Persian calendar) are fully localized and not affected. If you need Persian PDFs today, print the report from the viewer to "Save as PDF" in the browser, which uses the browser's own text engine.
+
+## Layout
+
+- A band that does not fit on a page moves to the next page. Bands taller than a page are clipped, with a warning.
+- Text is measured with the standard PDF font metrics or with the fonts you register. If the browser shows a different font than the one measured, line breaks can differ slightly from the PDF.
+- Right-to-left layout of whole reports (mirrored column order) is not automatic. Place the components right to left in the template, as in the Persian examples.
+
+## Images
+
+PNG and JPEG only in PDF and Excel. SVG and WebP images are not supported.
+
+## Excel
+
+- Dates in non-Gregorian calendars are exported as text.
+- Single-sheet mode leaves out page headers, footers and repeated headers so that data stays contiguous.
+
+## Bundle size
+
+The standard font metrics (about 130 kB) are part of the core bundle, because text is measured while the report is laid out. The core package is about 75 kB gzipped. PDF and Excel libraries load only when you export.
+
+## Designer
+
+- Components cannot be rotated.
+- Bands cannot be reordered by dragging; use the *Report* properties to add and remove bands.
+- Multi-selection is limited to components of one band.

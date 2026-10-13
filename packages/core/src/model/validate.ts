@@ -1,6 +1,7 @@
 import {
   BORDER_LINE_STYLES,
   BORDER_SIDES,
+  CALENDARS,
   COMPONENT_TYPES,
   FIELD_TYPES,
   FONT_STYLES,
@@ -445,6 +446,7 @@ class Validator {
       'pageBreakBefore',
       'pageBreakAfter',
       'style',
+      'designColor',
     ];
     if (opts.pageBand) allowed.push('printOnFirstPage', 'printOnLastPage');
     if (opts.kind) allowed.push('kind');
@@ -460,6 +462,7 @@ class Validator {
       this.optionalBoolean(b, 'printOnLastPage', path);
     }
     this.expression(b, 'visible', path);
+    this.color(b, 'designColor', path);
 
     if (b.style !== undefined) {
       const sPath = join(path, 'style');
@@ -578,7 +581,7 @@ class Validator {
     const type = this.requireEnum(c, 'type', COMPONENT_TYPES, path);
     const base = ['id', 'type', 'name', 'x', 'y', 'width', 'height', 'styleName', 'style', 'conditions', 'visible', 'growToHeight'];
     const extra: Record<string, string[]> = {
-      text: ['text', 'format', 'canGrow', 'wordWrap'],
+      text: ['text', 'format', 'canGrow', 'wordWrap', 'allowHtml'],
       image: ['src', 'fit'],
       line: ['orientation'],
       rectangle: ['cornerRadius'],
@@ -618,6 +621,7 @@ class Validator {
         if (c.format !== undefined) this.format(c.format, join(path, 'format'));
         this.optionalBoolean(c, 'canGrow', path);
         this.optionalBoolean(c, 'wordWrap', path);
+        this.optionalBoolean(c, 'allowHtml', path);
         break;
       case 'image':
         this.interpolated(c, 'src', path);
@@ -658,8 +662,9 @@ class Validator {
         this.requireNumber(f, 'decimals', path, { optional: true, min: 0, integer: true });
         break;
       case 'date':
-        this.noUnknownKeys(f, ['type', 'pattern'], path);
+        this.noUnknownKeys(f, ['type', 'pattern', 'calendar'], path);
         this.requireNonEmptyString(f, 'pattern', path);
+        this.requireEnum(f, 'calendar', CALENDARS, path, true);
         break;
       default:
         this.error(join(path, 'type'), 'must be one of: number, currency, percent, date');

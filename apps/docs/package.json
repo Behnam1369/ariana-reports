@@ -1,0 +1,33 @@
+{
+  "name": "docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/generate-api.mjs && astro dev",
+    "build": "node scripts/generate-api.mjs && astro build",
+    "preview": "astro preview",
+    "api": "node scripts/generate-api.mjs"
+  },
+  "dependencies": {
+    "@ariana-reports/core": "workspace:*",
+    "@ariana-reports/react": "workspace:*",
+    "@ariana-reports/vue": "workspace:*",
+    "@astrojs/markdown-remark": "7.3.2",
+    "@astrojs/react": "7.0.1",
+    "@astrojs/starlight": "0.42.6",
+    "@astrojs/vue": "7.0.3",
+    "@fontsource/vazirmatn": "5.3.0",
+    "astro": "7.3.8",
+    "oxc-transform-react": "0.145.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typedoc": "0.28.20",
+    "typedoc-plugin-markdown": "4.13.1",
+    "typescript": "5.9.3"
+  }
+}

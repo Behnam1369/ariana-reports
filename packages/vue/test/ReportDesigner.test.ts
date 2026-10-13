@@ -1,7 +1,7 @@
 import { flushPromises, mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick } from 'vue';
-import { DesignerController, designScale, findBand, findComponent, type ReportTemplate } from '@ariana-report/core';
+import { DesignerController, designScale, findBand, findComponent, type ReportTemplate } from '@ariana-reports/core';
 import { ReportDesigner, useDesigner } from '../src';
 import { salesData, salesTemplate } from './fixtures';
 
@@ -94,7 +94,69 @@ describe('ReportDesigner (Vue): surface', () => {
     expect(component('cust').findAll('.ar-handle')).toHaveLength(8);
     await pointerDown(component('tot'), { shiftKey: true });
     expect(controller.getState().selection.componentIds).toEqual(['cust', 'tot']);
-    expect(component('cust').findAll('.ar-handle')).toHaveLength(0);
+    expect(component('cust').findAll('.ar-handle')).toHaveLength(8);
+    expect(component('tot').findAll('.ar-handle')).toHaveLength(8);
+  });
+
+  it('resizes every selected component with one handle', async () => {
+    const { controller, component, comp } = setup();
+    controller.select(['cust', 'tot']);
+    await nextTick();
+    await drag(component('tot').get('[data-handle="s"]'), { x: 0, y: 0 }, { x: 0, y: 6 * SCALE });
+    expect(comp('cust')!.height).toBe(26);
+    expect(comp('tot')!.height).toBe(26);
+  });
+
+  it('edits text in a dialog opened by double click', async () => {
+    const { w, controller, component, comp } = setup();
+    await component('cust').trigger('dblclick');
+    const dialog = w.get('[role="dialog"]');
+    const area = dialog.get('textarea').element as HTMLTextAreaElement;
+    expect(area.value).toBe('{{ row.customer }}');
+    expect(document.activeElement).toBe(area);
+    await dialog.get('textarea').setValue('Name: ');
+    area.setSelectionRange(area.value.length, area.value.length);
+    await dialog.findAll('.ar-editor-list button').find((b) => b.text() === 'row.customer')!.trigger('click');
+    expect(area.value).toBe('Name: {{ row.customer }}');
+    area.setSelectionRange(0, 4);
+    await dialog.get('button[aria-label="Bold"]').trigger('click');
+    expect(area.value).toBe('<b>Name</b>: {{ row.customer }}');
+    expect(comp('cust')).toMatchObject({ text: '{{ row.customer }}' });
+    await buttonNamed(w, 'Apply').trigger('click');
+    expect(w.find('[role="dialog"]').exists()).toBe(false);
+    expect(comp('cust')).toMatchObject({ text: '<b>Name</b>: {{ row.customer }}', allowHtml: true });
+    controller.undo();
+    expect(comp('cust')).toMatchObject({ text: '{{ row.customer }}' });
+  });
+
+  it('opens the text editor from the properties panel and cancels with Escape', async () => {
+    const { w, controller, comp } = setup();
+    controller.select(['cust']);
+    await nextTick();
+    await buttonNamed(w, 'Open text editor').trigger('click');
+    await w.get('[role="dialog"] textarea').setValue('changed');
+    await w.get('[role="dialog"]').trigger('keydown', { key: 'Escape' });
+    expect(w.find('[role="dialog"]').exists()).toBe(false);
+    expect(comp('cust')).toMatchObject({ text: '{{ row.customer }}' });
+  });
+
+  it('colors bands and lets users change the color', async () => {
+    const { w, controller } = setup();
+    controller.selectBand('detail');
+    await nextTick();
+    const input = byLabel(w, 'Band color');
+    await input.setValue('#123456');
+    expect(findBand(controller.template, 'detail')!.band.designColor).toBe('#123456');
+    const section = w.get('[data-section-band="detail"]').element as HTMLElement;
+    expect(section.style.getPropertyValue('--ar-band-color')).toBe('#123456');
+    expect(section.style.getPropertyValue('--ar-band-caption-text')).toBe('#ffffff');
+  });
+
+  it('applies a theme as CSS variables', () => {
+    const { w } = setup(salesTemplate(), { theme: { primary: '#ff5722', radius: 10, mode: 'dark' } });
+    const root = w.get('.ar-root').element as HTMLElement;
+    expect(root.style.getPropertyValue('--ar-primary')).toBe('#ff5722');
+    expect(root.style.getPropertyValue('--ar-radius')).toBe('10px');
   });
 
   it('moves by dragging as one undo step', async () => {
@@ -105,16 +167,93 @@ describe('ReportDesigner (Vue): surface', () => {
     expect(comp('cust')).toMatchObject({ x: 0, y: 0 });
   });
 
-  it('moves a component into another band', async () => {
-    const { controller, component, band, comp } = setup();
-    const footer = band('ftr').element as HTMLElement;
-    footer.getBoundingClientRect = () => ({ left: 0, top: 500, right: 400, bottom: 530, width: 400, height: 30, x: 0, y: 500, toJSON: () => ({}) });
-    document.elementFromPoint = vi.fn(() => footer);
-    await drag(component('cust'), { x: 0, y: 0 }, { x: 10 * SCALE, y: 500 + 2 * SCALE });
+  /** jsdom has no layout: give each section a fixed screen position. */
+  function stubLayout(w: VueWrapper) {
+    const rect = (top: number, height: number) => () => ({ left: 0, top, right: 600, bottom: top + height, width: 600, height, x: 0, y: top, toJSON: () => ({}) });
+    ['rh', 'hdr', 'detail', 'ftr'].forEach((id, i) => {
+      const section = w.get(`[data-section-band="${id}"]`).element as HTMLElement;
+      section.getBoundingClientRect = rect(i * 100, 100);
+      (section.querySelector('[data-band-id]') as HTMLElement).getBoundingClientRect = rect(i * 100 + 22, 66);
+    });
+  }
+
+  it('moves a component into another band while dragging over it', async () => {
+    const { w, controller, component, comp } = setup();
+    stubLayout(w);
+    await pointerDown(component('cust'), { clientX: 0, clientY: 222 });
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 10 * SCALE, clientY: 322 + 2 * SCALE }));
+    await nextTick();
     expect(findComponent(controller.template, 'cust')!.band.band.id).toBe('ftr');
+    expect(w.get('[data-band-id="ftr"]').classes()).toContain('ar-band-drop');
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 10 * SCALE, clientY: 222 + 4 * SCALE }));
+    expect(findComponent(controller.template, 'cust')!.band.band.id).toBe('detail');
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 10 * SCALE, clientY: 322 + 2 * SCALE }));
+    window.dispatchEvent(new PointerEvent('pointerup', { clientX: 10 * SCALE, clientY: 322 + 2 * SCALE }));
+    await nextTick();
     expect(comp('cust')).toMatchObject({ x: 10, y: 2 });
-    // @ts-expect-error remove the jsdom stub
-    delete document.elementFromPoint;
+    expect(controller.getState().selection).toEqual({ componentIds: ['cust'], bandId: 'ftr' });
+    controller.undo();
+    expect(findComponent(controller.template, 'cust')!.band.band.id).toBe('detail');
+  });
+
+  it('moves a multi-selection into another band', async () => {
+    const { w, controller, component, comp } = setup();
+    stubLayout(w);
+    controller.select(['cust', 'tot']);
+    await nextTick();
+    await drag(component('cust'), { x: 0, y: 222 }, { x: 0, y: 322 + 5 * SCALE });
+    expect(findComponent(controller.template, 'tot')!.band.band.id).toBe('ftr');
+    expect(comp('cust')).toMatchObject({ x: 0, y: 5 });
+    expect(comp('tot')).toMatchObject({ x: 180, y: 5 });
+  });
+
+  it('selects with a marquee started in the page margin', async () => {
+    const { w, controller } = setup();
+    stubLayout(w);
+    w.findAll('[data-band-id]').forEach((b, i) => {
+      (b.element as HTMLElement).getBoundingClientRect = () => ({ left: 20, top: i * 100 + 22, right: 420, bottom: i * 100 + 88, width: 400, height: 66, x: 20, y: i * 100 + 22, toJSON: () => ({}) });
+    });
+    const surface = w.get('.ar-surface');
+    // From the left margin (x = 5) across the detail band (y 222..288).
+    await drag(surface, { x: 5, y: 215 }, { x: 20 + 300 * SCALE, y: 230 });
+    expect(controller.getState().selection).toEqual({ componentIds: ['cust', 'tot'], bandId: 'detail' });
+    // A click in the margin clears the selection.
+    await drag(surface, { x: 5, y: 5 }, { x: 5, y: 5 });
+    expect(controller.getState().selection.componentIds).toEqual([]);
+  });
+
+  it('offers registered fonts in the font list', async () => {
+    const { w, controller } = setup(salesTemplate(), { fonts: ['Vazirmatn'] });
+    controller.select(['cust']);
+    await nextTick();
+    const options = (byLabel(w, 'Font').element as HTMLSelectElement).options;
+    expect(Array.from(options).map((o) => o.value)).toEqual(['', 'Helvetica', 'Times', 'Courier', 'Vazirmatn']);
+  });
+
+  it('selects with a marquee started in the empty strip below a band', async () => {
+    const { w, controller } = setup();
+    await drag(w.get('[data-band-gap="detail"]'), { x: 0, y: 0 }, { x: 300 * SCALE, y: 10 * SCALE });
+    expect(controller.getState().selection).toEqual({ componentIds: ['cust', 'tot'], bandId: 'detail' });
+  });
+
+  it('shows the page margins and can hide them', async () => {
+    const { w, controller } = setup();
+    const surface = w.get('.ar-surface').element as HTMLElement;
+    expect(w.find('.ar-margin-guide').exists()).toBe(true);
+    expect(surface.style.paddingLeft).toBe(`${controller.template.page.margins.left * SCALE}px`);
+    await buttonNamed(w, 'Margins').trigger('click');
+    expect(w.find('.ar-margin-guide').exists()).toBe(false);
+    expect(parseFloat(surface.style.width)).toBeCloseTo(controller.bodyWidth() * SCALE, 2);
+  });
+
+  it('translates the UI and switches to right-to-left with uiLocale="fa"', async () => {
+    const { w } = setup(salesTemplate(), { uiLocale: 'fa' });
+    expect(w.get('.ar-root').attributes('dir')).toBe('rtl');
+    expect(w.get('.ar-surface').element.closest('[dir]')!.getAttribute('dir')).toBe('rtl');
+    expect(w.text()).toContain('طراحی');
+    const captions = w.findAll('.ar-section-caption').map((c) => c.element.firstElementChild!.textContent);
+    expect(captions[0]).toBe('سرصفحهٔ گزارش');
+    expect(captions).toContain('جزئیات: orders');
   });
 
   it('resizes components and bands', async () => {
@@ -194,7 +333,11 @@ describe('ReportDesigner (Vue): toolbar', () => {
     controller.select(['cust', 'tot']);
     await nextTick();
     await buttonNamed(w, 'Align right').trigger('click');
-    expect(comp('cust')!.x).toBe(180);
+    expect(comp('cust')).toMatchObject({ x: 50, style: { textAlign: 'right' } });
+    expect(comp('tot')!.style).toMatchObject({ textAlign: 'right' });
+    expect(buttonNamed(w, 'Align right').attributes('aria-pressed')).toBe('true');
+    await buttonNamed(w, 'Align middle').trigger('click');
+    expect(comp('tot')!.style).toMatchObject({ textAlign: 'right', verticalAlign: 'middle' });
     await buttonNamed(w, 'Delete').trigger('click');
     expect(comp('cust')).toBeUndefined();
   });

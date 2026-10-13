@@ -1,0 +1,64 @@
+---
+title: Groups and master-detail
+description: Group rows with subtotals, and nest one data region inside another.
+---
+
+import Demo from '../../../components/Demo.astro';
+
+## Groups
+
+A group adds a header and a footer around runs of rows that share a key. Add `groups` to a data region, outermost first:
+
+```json
+{
+  "kind": "dataRegion",
+  "id": "orders_region",
+  "dataSource": "orders",
+  "sort": [{ "expression": "row.date", "direction": "asc" }],
+  "groups": [{
+    "id": "by_customer",
+    "expression": "row.customer",
+    "sortDirection": "asc",
+    "header": { "id": "gh", "height": 8, "components": [
+      { "id": "gh1", "type": "text", "x": 0, "y": 1, "width": 186, "height": 6, "text": "{{ group.key }}" }
+    ]},
+    "footer": { "id": "gf", "height": 8, "components": [
+      { "id": "gf1", "type": "text", "x": 134, "y": 1, "width": 52, "height": 6, "text": "{{ sum(group.rows, 'amount') }}" }
+    ]}
+  }],
+  "detail": { "id": "row", "height": 6.5, "components": [] }
+}
+```
+
+- The group expression is evaluated for each row; consecutive rows with an equal value form a group.
+- `sortDirection` sorts the rows by the group key first: `asc` (default), `desc`, or `none` to group consecutive rows as they are.
+- Inside group bands: `group.key`, `group.rows`, `group.count`, `group.index`, `group.level`. With nested groups, `groups` lists them outermost first.
+- `pageBreakBefore: true` on a group starts each group (after the first) on a new page.
+
+<Demo name="viewer-grouping" example="sales" height={560} />
+
+## Master-detail
+
+A child region renders after each row of its parent. It reads its rows from an array field of the parent row (`relation`), or from another data source (`dataSource` with a `filter`).
+
+```json
+{
+  "kind": "dataRegion",
+  "id": "orders_region",
+  "dataSource": "orders",
+  "detail": { "id": "order", "height": 9, "components": [] },
+  "children": [{
+    "kind": "dataRegion",
+    "id": "items_region",
+    "relation": "items",
+    "detail": { "id": "item", "height": 6, "components": [] },
+    "footer": { "id": "items_total", "height": 9, "components": [
+      { "id": "t", "type": "text", "x": 161, "y": 1, "width": 25, "height": 6, "text": "{{ sum(rows, r => r.qty * r.price) }}" }
+    ]}
+  }]
+}
+```
+
+Inside the child, `row` is the item and `parent` is the order, so `{{ parent.id }}` works in item bands. Children can have children of their own.
+
+<Demo name="viewer-master-detail" example="orders" height={560} />

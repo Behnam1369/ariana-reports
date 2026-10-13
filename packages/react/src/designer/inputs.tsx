@@ -1,5 +1,20 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
-import { checkExpression, compileText } from '@ariana-report/core';
+import { useContext, useEffect, useId, useState, type ReactNode } from 'react';
+import { checkExpression, compileText, optionLabel } from '@ariana-reports/core';
+import { DesignerContext } from './context';
+import { Icon } from '../Icon';
+
+/** Collapsible panel section. */
+export function Section({ title, children, defaultOpen = true }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
+  return (
+    <details className="ar-section" open={defaultOpen}>
+      <summary>
+        <Icon name="chevron" />
+        <span>{title}</span>
+      </summary>
+      <div className="ar-section-body">{children}</div>
+    </details>
+  );
+}
 
 interface FieldProps {
   label: string;
@@ -151,6 +166,7 @@ export function SelectInput<T extends string>({
   onChange,
   allowEmpty,
   ariaLabel,
+  translate,
 }: {
   id?: string;
   value: T | undefined;
@@ -158,7 +174,10 @@ export function SelectInput<T extends string>({
   onChange: (value: T | undefined) => void;
   allowEmpty?: string;
   ariaLabel?: string;
+  /** Show string options through the UI locale's value translations (for enum values such as "bold"). */
+  translate?: boolean;
 }) {
+  const values = useContext(DesignerContext)?.values;
   return (
     <select
       id={id}
@@ -169,7 +188,7 @@ export function SelectInput<T extends string>({
     >
       {allowEmpty !== undefined && <option value="">{allowEmpty}</option>}
       {options.map((o) => {
-        const opt = typeof o === 'string' ? { value: o, label: o } : o;
+        const opt = typeof o === 'string' ? { value: o, label: translate && values ? optionLabel(values, o) : o } : o;
         return (
           <option key={opt.value} value={opt.value}>
             {opt.label}
@@ -194,9 +213,10 @@ const HEX6 = /^#[0-9a-f]{6}$/i;
 
 /** Color picker with a clear button. Non-hex colors (rgba, #rgb) are shown but replaced on pick. */
 export function ColorInput({ id, value, onChange, ariaLabel }: { id?: string; value: string | undefined; onChange: (v: string | undefined) => void; ariaLabel?: string }) {
+  const labels = useContext(DesignerContext)?.labels;
   const short = value && /^#[0-9a-f]{3}$/i.test(value) ? `#${[...value.slice(1)].map((c) => c + c).join('')}` : value;
   return (
-    <div className="ar-field-row">
+    <div className="ar-color">
       <input
         id={id}
         type="color"
@@ -205,10 +225,10 @@ export function ColorInput({ id, value, onChange, ariaLabel }: { id?: string; va
         value={short && HEX6.test(short) ? short : '#000000'}
         onChange={(e) => onChange(e.target.value)}
       />
-      <span className="ar-hint">{value ?? 'none'}</span>
+      <span className="ar-hint">{value ?? labels?.noColor ?? 'none'}</span>
       {value !== undefined && (
-        <button type="button" className="ar-btn" aria-label={`Clear ${ariaLabel ?? 'color'}`} onClick={() => onChange(undefined)}>
-          ×
+        <button type="button" className="ar-btn ar-btn-icon ar-btn-sm" aria-label={`${labels?.clear ?? 'Clear'} ${ariaLabel ?? 'color'}`} title={labels?.clear ?? 'Clear'} onClick={() => onChange(undefined)}>
+          <Icon name="close" />
         </button>
       )}
     </div>
