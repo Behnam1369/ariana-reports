@@ -6,6 +6,7 @@ import type {
   ImageFit,
   TextAlign,
   TextDecoration,
+  TextDirection,
   ValueFormat,
   VerticalAlign,
 } from '../model/types';
@@ -81,6 +82,7 @@ export interface ResolvedStyle {
   backgroundColor?: string;
   textAlign: TextAlign;
   verticalAlign: VerticalAlign;
+  direction: TextDirection;
   padding: ResolvedPadding;
   border?: ResolvedBorder;
 }
@@ -99,8 +101,15 @@ export interface LayoutText extends LayoutItemBase {
   kind: 'text';
   /** Full text after interpolation and formatting. */
   text: string;
-  /** Wrapped lines; renderers must not re-wrap. */
+  /** Wrapped lines in logical order; renderers must not re-wrap. */
   lines: string[];
+  /**
+   * Resolved base direction of the text (`style.direction`, with `auto`
+   * decided by the first strong character). Renderers reorder each line with
+   * the Unicode bidi algorithm on this base. When absent it is derived from
+   * `style.direction` and the text.
+   */
+  direction?: 'ltr' | 'rtl';
   /** Distance between baselines, in points. */
   lineHeight: number;
   /**

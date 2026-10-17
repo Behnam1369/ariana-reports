@@ -471,6 +471,14 @@ describe('ReportDesigner: properties', () => {
     expect((comp('tot') as any).format).toEqual({ type: 'currency', currency: 'USD' });
     await user.selectOptions(screen.getByLabelText('Weight'), 'bold');
     expect(comp('tot')!.style).toEqual({ fontWeight: 'bold' });
+    const direction = screen.getByLabelText('Direction') as HTMLSelectElement;
+    expect(Array.from(direction.options).map((o) => o.text)).toEqual(['(default)', 'Auto', 'Left to right', 'Right to left']);
+    await user.selectOptions(direction, 'rtl');
+    expect(comp('tot')!.style).toEqual({ fontWeight: 'bold', direction: 'rtl' });
+    expect(document.querySelector('[data-component-id="tot"] .ar-component-body')!.getAttribute('dir')).toBe('rtl');
+    await user.selectOptions(direction, '');
+    expect(comp('tot')!.style).toEqual({ fontWeight: 'bold' });
+    expect(document.querySelector('[data-component-id="tot"] .ar-component-body')!.getAttribute('dir')).toBe('auto');
     await user.click(screen.getByLabelText('Border'));
     expect(comp('tot')!.style!.border).toEqual({ width: 0.5, color: '#000000', style: 'solid' });
     await user.click(screen.getByLabelText('top'));

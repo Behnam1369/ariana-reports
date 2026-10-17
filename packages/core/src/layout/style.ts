@@ -12,6 +12,7 @@ export const DEFAULT_STYLE: Readonly<Required<Omit<StyleProps, 'backgroundColor'
   color: '#000000',
   textAlign: 'left',
   verticalAlign: 'top',
+  direction: 'auto',
 };
 
 /** Merges style layers; later layers win. Undefined values do not override. */
@@ -56,8 +57,10 @@ export function resolveStyle(style: StyleProps, unit: Unit): ResolvedStyle {
     fontStyle: style.fontStyle ?? DEFAULT_STYLE.fontStyle,
     textDecoration: style.textDecoration ?? DEFAULT_STYLE.textDecoration,
     color: style.color ?? DEFAULT_STYLE.color,
-    textAlign: style.textAlign ?? DEFAULT_STYLE.textAlign,
+    // Right-to-left text starts at the right edge unless an alignment is set.
+    textAlign: style.textAlign ?? (style.direction === 'rtl' ? 'right' : DEFAULT_STYLE.textAlign),
     verticalAlign: style.verticalAlign ?? DEFAULT_STYLE.verticalAlign,
+    direction: style.direction ?? DEFAULT_STYLE.direction,
     padding: resolvePadding(style.padding, unit),
   };
   if (style.backgroundColor !== undefined && style.backgroundColor !== 'transparent') {

@@ -449,6 +449,14 @@ describe('ReportDesigner (Vue): properties', () => {
     expect((comp('tot') as any).format).toEqual({ type: 'currency', currency: 'USD' });
     await byLabel(w, 'Weight').setValue('bold');
     expect(comp('tot')!.style).toEqual({ fontWeight: 'bold' });
+    const direction = byLabel(w, 'Direction');
+    expect(direction.findAll('option').map((o) => o.text())).toEqual(['(default)', 'Auto', 'Left to right', 'Right to left']);
+    await direction.setValue('rtl');
+    expect(comp('tot')!.style).toEqual({ fontWeight: 'bold', direction: 'rtl' });
+    expect(w.get('[data-component-id="tot"] .ar-component-body').attributes('dir')).toBe('rtl');
+    await direction.setValue('');
+    expect(comp('tot')!.style).toEqual({ fontWeight: 'bold' });
+    expect(w.get('[data-component-id="tot"] .ar-component-body').attributes('dir')).toBe('auto');
     await byLabel(w, 'Border').setValue(true);
     expect(comp('tot')!.style!.border).toEqual({ width: 0.5, color: '#000000', style: 'solid' });
     await byLabel(w, 'top').setValue(false);

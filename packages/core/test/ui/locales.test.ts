@@ -25,6 +25,8 @@ describe('UI locales', () => {
     expect(Object.keys(fa.labels).sort()).toEqual(Object.keys(DEFAULT_LABELS).sort());
     expect(ui.labels.nextPage).toBe('صفحهٔ بعد');
     expect(optionLabel(ui.values, 'portrait')).toBe('عمودی');
+    expect(optionLabel(ui.values, 'rtl')).toBe('راست به چپ');
+    expect(ui.labels.textDirection).toBe('جهت متن');
     expect(optionLabel(ui.values, 'A4')).toBe('A4');
   });
 

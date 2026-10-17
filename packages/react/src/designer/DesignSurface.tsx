@@ -127,7 +127,7 @@ function ComponentView({ component, bandId, scale }: { component: ReportComponen
       onDoubleClick={component.type === 'text' ? () => openTextEditor(component.id) : undefined}
     >
       {component.type === 'text' && (
-        <span className="ar-component-body">
+        <span className="ar-component-body" dir={preview.dir}>
           {preview.runs
             ? preview.runs.map((r, i) => (
                 <span key={i} style={r.style}>

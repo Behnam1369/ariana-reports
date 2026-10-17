@@ -21,5 +21,18 @@ export {
   type RunBase,
   type TextRun,
 } from './html';
+export {
+  bidiLevels,
+  detectDirection,
+  hasRtlCharacters,
+  isBidiControl,
+  mirrorChar,
+  reorderSegments,
+  resolveBaseDirection,
+  toVisualOrder,
+  visualRuns,
+  type BaseDirection,
+  type VisualRun,
+} from './bidi';
 export { DEFAULT_STYLE, mergeStyles, resolveBorder, resolvePadding, resolveStyle } from './style';
 export { compareValues, readPath, toRows } from './data';

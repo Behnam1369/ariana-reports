@@ -23,7 +23,12 @@ export interface ResolvedUiLocale {
   values: Record<string, string>;
 }
 
-export const en: UiLocale = { code: 'en', dir: 'ltr', labels: DEFAULT_LABELS };
+export const en: UiLocale = {
+  code: 'en',
+  dir: 'ltr',
+  labels: DEFAULT_LABELS,
+  values: { auto: 'Auto', ltr: 'Left to right', rtl: 'Right to left' },
+};
 
 const registry = new Map<string, UiLocale>([
   ['en', en],

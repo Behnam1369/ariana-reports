@@ -22,6 +22,7 @@ import { mergeStyles, resolveBorder, resolveStyle } from './style';
 import { createStandardFontMeasurer, LINE_HEIGHT_FACTOR, wrapText, type TextMeasurer } from './text';
 import type { LayoutBand, LayoutDocument, LayoutIssue, LayoutItem, LayoutPage, LayoutTextRun } from './types';
 import { parseHtmlText, resolveRuns, runsText, wrapRuns } from './html';
+import { resolveBaseDirection } from './bidi';
 
 export interface GenerateOptions {
   /** Values for template parameters; override parameter defaults. */
@@ -386,7 +387,7 @@ class ReportGenerator {
 
     switch (c.type) {
       case 'text':
-        return this.measureText(c, base, ctx, scope);
+        return this.measureText(c, base, ctx, scope, raw);
       case 'image': {
         let src = '';
         try {
@@ -423,6 +424,7 @@ class ReportGenerator {
     base: Omit<Extract<LayoutItem, { kind: 'text' }>, 'kind' | 'text' | 'lines' | 'lineHeight' | 'value'>,
     ctx: { bandId: string; componentId: string },
     scope: Scope,
+    raw: StyleProps,
   ): LayoutItem {
     let text: string;
     let value: unknown;
@@ -479,7 +481,10 @@ class ReportGenerator {
     if (c.canGrow) {
       height = Math.max(height, lines.length * lineHeight + style.padding.top + style.padding.bottom);
     }
-    const item: LayoutItem = { ...base, height, kind: 'text', text, lines, lineHeight, value };
+    const direction = resolveBaseDirection(text, style.direction);
+    // `auto` text that turns out right-to-left starts at the right edge unless an alignment is set.
+    const itemStyle = direction === 'rtl' && raw.textAlign === undefined ? { ...style, textAlign: 'right' as const } : style;
+    const item: LayoutItem = { ...base, style: itemStyle, height, kind: 'text', text, lines, lineHeight, direction, value };
     if (c.format) item.format = c.format;
     if (error) item.error = true;
     if (runs && richText) {

@@ -15,6 +15,7 @@ import {
   SORT_DIRECTIONS,
   STYLE_KEYS,
   TEXT_ALIGNS,
+  TEXT_DIRECTIONS,
   TEXT_DECORATIONS,
   UNITS,
   VERTICAL_ALIGNS,
@@ -397,6 +398,7 @@ class Validator {
     this.color(s, 'backgroundColor', path);
     this.requireEnum(s, 'textAlign', TEXT_ALIGNS, path, true);
     this.requireEnum(s, 'verticalAlign', VERTICAL_ALIGNS, path, true);
+    this.requireEnum(s, 'direction', TEXT_DIRECTIONS, path, true);
 
     if (s.padding !== undefined) {
       const pPath = join(path, 'padding');

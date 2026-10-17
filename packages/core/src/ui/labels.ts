@@ -130,6 +130,7 @@ export const DEFAULT_LABELS = {
   color: 'Color',
   textColor: 'Text color',
   verticalAlign: 'Vertical',
+  textDirection: 'Direction',
   padding: 'Padding',
   background: 'Background',
   backgroundColor: 'Background color',
