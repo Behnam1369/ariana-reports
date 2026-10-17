@@ -9,7 +9,8 @@ The three packages (`@ariana-reports/core`, `/react`, `/vue`) are versioned toge
    ```bash
    corepack pnpm configure --owner <github-user> --author "Your Name" --site https://<site>.netlify.app
    ```
-3. Create the GitHub repository, push, and add the repository secret `NPM_TOKEN` (npm → Access Tokens → Granular token with read/write on the `@ariana-report` packages, "bypass 2FA" enabled for automation).
+3. Create the GitHub repository and push.
+4. After the first manual publish, turn on **trusted publishing** for each package (`core`, `react`, `vue`), so the release workflow can publish without a token: npmjs.com → the package → **Settings** → **Trusted Publisher** → GitHub Actions, with user `Behnam1369`, repository `ariana-reports`, workflow `release.yml`, environment empty. The workflow installs npm 11 (trusted publishing needs npm 11.5.1 or later) and has the `id-token: write` permission. No `NPM_TOKEN` secret is needed.
 
 ## First release (0.1.0), by hand
 
