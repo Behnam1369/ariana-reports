@@ -92,6 +92,13 @@ export type TextAlign = (typeof TEXT_ALIGNS)[number];
 export const VERTICAL_ALIGNS = ['top', 'middle', 'bottom'] as const;
 export type VerticalAlign = (typeof VERTICAL_ALIGNS)[number];
 
+/**
+ * Base direction of text. `auto` follows the first strong character, so a
+ * text starting with a Persian or Arabic letter is right-to-left.
+ */
+export const TEXT_DIRECTIONS = ['auto', 'ltr', 'rtl'] as const;
+export type TextDirection = (typeof TEXT_DIRECTIONS)[number];
+
 export const BORDER_LINE_STYLES = ['solid', 'dashed', 'dotted'] as const;
 export type BorderLineStyle = (typeof BORDER_LINE_STYLES)[number];
 
@@ -125,6 +132,12 @@ export interface StyleProps {
   backgroundColor?: string;
   textAlign?: TextAlign;
   verticalAlign?: VerticalAlign;
+  /**
+   * Base text direction: `ltr`, `rtl` or `auto` (the default, decided by the
+   * first strong character). Right-to-left text is right-aligned unless
+   * `textAlign` is set.
+   */
+  direction?: TextDirection;
   /** Padding in template units: one value for all sides, or per side. */
   padding?: number | Padding;
   border?: BorderSpec;
@@ -140,6 +153,7 @@ export const STYLE_KEYS = [
   'backgroundColor',
   'textAlign',
   'verticalAlign',
+  'direction',
   'padding',
   'border',
 ] as const satisfies readonly (keyof StyleProps)[];

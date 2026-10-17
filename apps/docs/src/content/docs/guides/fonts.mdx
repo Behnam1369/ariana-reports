@@ -81,6 +81,32 @@ The font drop-down lists the standard fonts, every font already used in the temp
 
 Listing a family only makes it selectable. It still needs the `@font-face` rule to display, and a file in `pdf.fonts` to be embedded.
 
+Use `.ttf`, `.otf` or `.woff` files. WOFF2 files are rejected with an error, because they cannot be embedded.
+
+## Characters a font does not have
+
+Each character is drawn with the first font that has it: the families in `fontFamily`, then the standard font, then every other registered font. So with Roboto and Vazirmatn registered, a Roboto component that contains Persian words draws them with Vazirmatn. The measurer makes the same choice, so line breaks still match.
+
+A family can be split over several files, as Fontsource and Google Fonts ship them (one file per script). Register each file under the same family:
+
+```ts
+const fonts = [
+  { family: 'Vazirmatn', data: arabicFile },
+  { family: 'Vazirmatn', data: latinFile },
+];
+```
+
+When no registered font has a character, the PDF shows `?` (standard fonts) or an empty box (registered fonts), and `exportPdf` reports the characters through `onWarning` (or the console when there is no handler).
+
 ## Persian, Arabic and other right-to-left text
 
-On screen, text in any script works as soon as the browser has a font for it: this site's Persian demos use the Vazirmatn font. In the PDF, embedded TrueType fonts are drawn glyph by glyph in logical order. Arabic-script text needs **contextual shaping** (letters change shape and join) and **right-to-left reordering**, and the PDF writer does not do either yet, so Persian and Arabic text in PDFs will look disconnected. See [Known limitations](/project/limitations/). Numbers, dates and the whole user interface are fully localized; see [Languages](/guides/languages/).
+The standard PDF fonts have no Persian or Arabic letters, so a PDF with such text needs a font file. Listing a name in the designer's `fonts` prop is not enough: register the file in `pdf.fonts` (and in `preview.pdf.fonts` for the designer).
+
+```ts
+const fonts = [
+  { family: 'Vazirmatn', data: await (await fetch('/fonts/Vazirmatn-Regular.ttf')).arrayBuffer() },
+  { family: 'Vazirmatn', bold: true, data: await (await fetch('/fonts/Vazirmatn-Bold.ttf')).arrayBuffer() },
+];
+```
+
+The embedded font joins the letters (contextual shaping), and every line is reordered with the Unicode bidirectional algorithm, so numbers and Latin words inside Persian text keep their order. The base direction comes from the `direction` style; see [Languages](/guides/languages/#right-to-left-text-in-reports).

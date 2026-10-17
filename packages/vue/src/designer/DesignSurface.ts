@@ -138,7 +138,7 @@ const ComponentView = defineComponent({
         },
         [
           c.type === 'text'
-            ? h('span', { class: 'ar-component-body' }, preview.runs ? preview.runs.map((r, i) => h('span', { key: i, style: r.style }, r.text)) : preview.label)
+            ? h('span', { class: 'ar-component-body', dir: preview.dir }, preview.runs ? preview.runs.map((r, i) => h('span', { key: i, style: r.style }, r.text)) : preview.label)
             : null,
           c.type === 'image' ? h('span', { class: 'ar-hint ar-component-label' }, preview.label) : null,
           ...(selected

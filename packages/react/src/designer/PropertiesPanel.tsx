@@ -15,6 +15,7 @@ import {
   TEXT_ALIGNS,
   TEXT_DECORATIONS,
   UNITS,
+  TEXT_DIRECTIONS,
   VERTICAL_ALIGNS,
   type Band,
   type BorderSpec,
@@ -91,6 +92,9 @@ function StyleEditor({ style, onChange, textProps = true }: { style: StyleProps;
           </Field>
           <Field label={labels.verticalAlign}>
             {(id) => <SelectInput id={id} value={style.verticalAlign} options={VERTICAL_ALIGNS} translate allowEmpty={labels.defaultOption} onChange={(verticalAlign) => onChange({ verticalAlign })} />}
+          </Field>
+          <Field label={labels.textDirection}>
+            {(id) => <SelectInput id={id} value={style.direction} options={TEXT_DIRECTIONS} translate allowEmpty={labels.defaultOption} onChange={(direction) => onChange({ direction })} />}
           </Field>
           <Field label={labels.padding}>{(id) => <NumberInput id={id} optional min={0} value={padding} onCommit={(p) => onChange({ padding: p })} />}</Field>
         </>

@@ -127,6 +127,25 @@ describe('renderPage', () => {
     expect(lines.at(-1)!.style.textAlign).toBe('left');
   });
 
+  it('sets the resolved text direction, as the PDF does', () => {
+    const doc = single([
+      text('سلام دنیا Hi', { id: 'fa' }),
+      text('Hello', { id: 'en', y: 20 }),
+      text('Hello', { id: 'forced', y: 40, style: { direction: 'rtl' } }),
+      text('آ ب پ ت ث ج چ ح خ د ذ ر', { id: 'just', y: 60, width: 40, height: 60, style: { textAlign: 'justify' } }),
+    ]);
+    const [fa, en, forced, just] = items(renderPage(doc, 0));
+    expect(fa!.dir).toBe('rtl');
+    expect((fa!.children[0] as HTMLElement).style.textAlign).toBe('right');
+    expect(en!.dir).toBe('ltr');
+    expect(forced!.dir).toBe('rtl');
+    expect((forced!.children[0] as HTMLElement).style.textAlign).toBe('right');
+    // The last line of right-to-left justified text starts at the right edge.
+    const lines = Array.from(just!.children) as HTMLElement[];
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.at(-1)!.style.textAlign).toBe('right');
+  });
+
   it('sets text content, never HTML', () => {
     const doc = single([text('<img src=x onerror="alert(1)">')]);
     const el = items(renderPage(doc, 0))[0]!;

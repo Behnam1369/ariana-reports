@@ -208,6 +208,25 @@ describe('exportExcel: grid', () => {
     expect(sheet.views[0]).toMatchObject({ showGridLines: false });
   });
 
+  it('sets the reading order of right-to-left and explicitly left-to-right text', async () => {
+    const t = tpl({
+      body: [
+        {
+          kind: 'band',
+          ...band(30, [
+            text('سلام', { x: 0, width: 60, height: 10 }),
+            text('Hello', { x: 60, width: 60, height: 10 }),
+            text('سلام', { x: 120, width: 60, height: 10, style: { direction: 'ltr' } }),
+          ]),
+        },
+      ],
+    });
+    const sheet = ws(await load(await exportExcel(generateReport(t, {}))));
+    expect(sheet.getCell(1, 1).alignment).toMatchObject({ readingOrder: 'rtl', horizontal: 'right' });
+    expect(sheet.getCell(1, 2).alignment.readingOrder).toBeUndefined();
+    expect(sheet.getCell(1, 3).alignment).toMatchObject({ readingOrder: 'ltr', horizontal: 'left' });
+  });
+
   it('can keep page bands', async () => {
     const wb = await load(await exportExcel(generateReport(tableTemplate(), data), { includePageBands: true }));
     const flat = values(ws(wb)).flat();

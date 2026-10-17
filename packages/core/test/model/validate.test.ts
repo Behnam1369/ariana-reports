@@ -194,6 +194,7 @@ describe('validateTemplate: styles', () => {
     expectError((t) => (t.styles.heading.fontWeight = 'heavy'), 'styles.heading.fontWeight');
     expectError((t) => (t.styles.heading.textAlign = 'middle'), 'styles.heading.textAlign');
     expectError((t) => (t.styles.heading.verticalAlign = 'center'), 'styles.heading.verticalAlign');
+    expectError((t) => (t.styles.heading.direction = 'right-to-left'), 'styles.heading.direction', /must be one of: auto, ltr, rtl/);
   });
 
   it('rejects unknown style keys', () => {

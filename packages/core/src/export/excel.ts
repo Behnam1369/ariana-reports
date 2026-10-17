@@ -1,4 +1,5 @@
-import type { Borders, Cell, Fill, Font, Worksheet } from 'exceljs';
+import type { Alignment, Borders, Cell, Fill, Font, Worksheet } from 'exceljs';
+import { resolveBaseDirection } from '../layout/bidi';
 import { toDate, toNumber } from '../format/format';
 import type { LayoutBand, LayoutDocument, LayoutItem, LayoutText, ResolvedBorder } from '../layout/types';
 import type { ValueFormat } from '../model/types';
@@ -411,11 +412,15 @@ class SheetWriter {
     } else {
       cell.value = value;
     }
-    cell.alignment = {
+    const alignment: Partial<Alignment> = {
       horizontal: s.textAlign === 'justify' ? 'justify' : s.textAlign,
       vertical: s.verticalAlign,
       wrapText: item.lines.length > 1 || item.text.includes('\n'),
     };
+    // Right-to-left text, or an explicit direction, sets the reading order; otherwise Excel uses the context.
+    const direction = item.direction ?? resolveBaseDirection(item.text, s.direction);
+    if (direction === 'rtl' || s.direction === 'ltr') alignment.readingOrder = direction;
+    cell.alignment = alignment;
     const fill = solidFill(s.backgroundColor);
     if (fill) this.fillRange([r1, r2], [c1, c2], fill);
     if (s.border) this.borderRange([r1, r2], [c1, c2], s.border);

@@ -5,11 +5,11 @@ description: What does not work yet.
 
 ariana-report is young. These are the limits to know about before you build on it.
 
-## Arabic-script text in PDF files
+## Right-to-left text in PDF files
 
-Persian, Arabic and Urdu text displays correctly **on screen**, where the browser shapes and reorders it. In **PDF files** it does not yet: the PDF writer draws each character in logical order without contextual joining and without right-to-left reordering, so the letters look disconnected and the order of mixed text can be wrong. Embedding a font (see [Fonts](/guides/fonts/)) fixes missing glyphs but not the shaping.
+Persian and Arabic text in PDFs needs a registered font that has those letters (see [Fonts](/guides/fonts/)). Without one, the standard PDF fonts draw `?` for each letter, and a warning is reported.
 
-The interface, numbers, currencies and dates (including the Persian calendar) are fully localized and not affected. If you need Persian PDFs today, print the report from the viewer to "Save as PDF" in the browser, which uses the browser's own text engine.
+The bidirectional algorithm used for PDFs covers implicit levels, numbers and paired brackets. Explicit embedding and isolate controls (U+202A to U+202E, U+2066 to U+2069) are ignored; LRM and RLM work. Bracket pairs are mirrored but not matched across a line (rule N0), which rarely matters in report text.
 
 ## Layout
 
@@ -28,7 +28,7 @@ PNG and JPEG only in PDF and Excel. SVG and WebP images are not supported.
 
 ## Bundle size
 
-The standard font metrics (about 130 kB) are part of the core bundle, because text is measured while the report is laid out. The core package is about 75 kB gzipped. PDF and Excel libraries load only when you export.
+The standard font metrics (about 130 kB) are part of the core bundle, because text is measured while the report is laid out. The core package is about 80 kB gzipped. PDF and Excel libraries load only when you export.
 
 ## Designer
 

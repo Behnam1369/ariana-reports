@@ -21,7 +21,7 @@ const { name, example, height = 460 } = Astro.props;
 const reactSources = import.meta.glob('../demos/react/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 const vueSources = import.meta.glob('../demos/vue/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 // The demos import their sample data from a shared file; show it as a file next to the component.
-const clean = (source: string) => source.replace("'../data'", "'./report-data'").trim();
+const clean = (source: string) => source.replace("'../data'", "'./report-data'").replace("'../fonts'", "'./fonts'").trim();
 const react = clean(reactSources[`../demos/react/${name}.tsx`] ?? '');
 const vue = clean(vueSources[`../demos/vue/${name}.vue`] ?? '');
 if (!react || !vue) throw new Error(`Demo "${name}" needs both demos/react/${name}.tsx and demos/vue/${name}.vue`);

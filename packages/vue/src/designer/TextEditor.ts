@@ -127,6 +127,7 @@ export const TextEditor = defineComponent({
                 h('textarea', {
                   ref: textarea,
                   class: 'ar-textarea',
+                  dir: 'auto',
                   'aria-label': l.textField,
                   'aria-invalid': error ? 'true' : undefined,
                   'aria-describedby': error ? errorId : undefined,

@@ -82,6 +82,8 @@ The locale decides digits (۱۲۳ for `fa-IR`, ١٢٣ for `ar-EG`), separators, 
 
 ## Right-to-left text in reports
 
-Text in Arabic-script languages displays correctly in the viewer, because the browser shapes it. Set `textAlign: "right"` for those cells. Text layout inside PDFs does not support shaping or right-to-left reordering yet; see [Known limitations](/project/limitations/).
+Every text component has a `direction` style: `auto` (the default), `ltr` or `rtl`. The designer shows it as **Direction** in the style properties. With `auto` the first strong letter decides, so a text that starts with a Persian word is right-to-left. Right-to-left text is right-aligned unless you set `textAlign`.
+
+The viewer, the PDF and Excel follow the same direction. In PDFs, letters are joined (shaped) by the embedded font, and each line is reordered with the Unicode bidirectional algorithm, so numbers and Latin words inside Persian text keep their order. The PDF needs a font file with Persian letters, such as Vazirmatn; see [Fonts](/guides/fonts/#persian-arabic-and-other-right-to-left-text).
 
 <Demo name="viewer-persian" example="persian" height={420} />

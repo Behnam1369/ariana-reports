@@ -115,6 +115,7 @@ export function TextEditor({ componentId, onClose }: { componentId: string; onCl
             <textarea
               ref={textarea}
               className="ar-textarea"
+              dir="auto"
               aria-label={labels.textField}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? errorId : undefined}

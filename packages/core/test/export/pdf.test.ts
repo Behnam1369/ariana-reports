@@ -116,8 +116,11 @@ describe('exportPdf: text', () => {
   it('replaces characters standard fonts cannot encode instead of failing', async () => {
     expect(sanitizeForStandardFont('Café 中\tok')).toBe('Café ?    ok');
     const doc = single([text('سلام Hi')]);
-    const drawn = drawnTexts((await loadPdf(await exportPdf(doc))).getPage(0));
-    expect(drawn[0]!.text).toBe('???? Hi');
+    const onWarning = vi.fn();
+    const drawn = drawnTexts((await loadPdf(await exportPdf(doc, { onWarning }))).getPage(0));
+    // The text starts with a Persian letter, so it is right-to-left: "Hi" is drawn on the left.
+    expect(drawn.map((d) => d.text).join('')).toBe('Hi ????');
+    expect(onWarning).toHaveBeenCalledWith(expect.stringMatching(/No font can draw "س" \(U\+0633\).*Register a font/));
   });
 
   it('adds underline and strike-through lines', async () => {

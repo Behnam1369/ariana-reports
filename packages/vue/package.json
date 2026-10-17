@@ -1,6 +1,6 @@
 {
   "name": "@ariana-reports/vue",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Vue 3 report viewer and report designer for ariana-report.",
   "license": "MIT",
   "author": "Behnam Aghaali",

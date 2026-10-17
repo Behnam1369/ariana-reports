@@ -12,6 +12,17 @@ import type {
   ResolvedStyle,
 } from '../layout/types';
 import { standardFontName } from '../layout/text';
+import {
+  bidiLevels,
+  isBidiControl,
+  mirrorChar,
+  reorderSegments,
+  resolveBaseDirection,
+  scriptDirection,
+  shapesRightToLeft,
+  type BaseDirection,
+} from '../layout/bidi';
+import { FontSet, loadFontkit, type FontChoice, type LoadedFont } from './fonts';
 import { parseColor } from './color';
 import { defaultImageLoader, fitImage, ImageCache, type ImageLoader } from './images';
 
@@ -40,67 +51,166 @@ export interface PdfExportOptions {
   subject?: string;
 }
 
-interface ResolvedFont {
-  font: PDFFont;
-  /** Standard fonts only encode WinAnsi; text must be sanitised. */
-  standard: boolean;
-}
+type FontVariant = { family: string; bold: boolean; italic: boolean };
 
+/** Embeds fonts on demand and picks a font per character (see `FontSet`). */
 class FontManager {
-  private readonly cache = new Map<string, Promise<ResolvedFont>>();
-  private fontkitRegistered = false;
+  private readonly embedded = new Map<LoadedFont | string, Promise<PDFFont>>();
+  private readonly missing = new Set<number>();
+  private set?: Promise<FontSet>;
 
   constructor(
     private readonly pdf: PDFDocument,
     private readonly fonts: FontRegistration[],
   ) {}
 
-  get(style: ResolvedStyle): Promise<ResolvedFont> {
-    const bold = style.fontWeight === 'bold';
-    const italic = style.fontStyle === 'italic';
-    const key = `${style.fontFamily}|${bold}|${italic}`;
-    let hit = this.cache.get(key);
+  fontSet(): Promise<FontSet> {
+    if (!this.set) {
+      this.set = (async () => {
+        if (this.fonts.length === 0) return new FontSet(undefined, []);
+        const fontkit = await loadFontkit();
+        this.pdf.registerFontkit(fontkit as unknown as Parameters<PDFDocument['registerFontkit']>[0]);
+        return new FontSet(fontkit, this.fonts);
+      })();
+    }
+    return this.set;
+  }
+
+  embed(choice: FontChoice, v: FontVariant): Promise<PDFFont> {
+    const key = choice ?? standardFontName(v.family, v.bold, v.italic);
+    let hit = this.embedded.get(key);
     if (!hit) {
-      hit = this.resolve(style.fontFamily, bold, italic);
-      this.cache.set(key, hit);
+      hit = choice ? this.pdf.embedFont(choice.bytes, { subset: true }) : this.pdf.embedFont(key as string);
+      this.embedded.set(key, hit);
     }
     return hit;
   }
 
-  private findCustom(family: string, bold: boolean, italic: boolean): FontRegistration | undefined {
-    const name = (family.split(',')[0] ?? '').trim().replace(/^["']|["']$/g, '').toLowerCase();
-    const sameFamily = this.fonts.filter((f) => f.family.toLowerCase() === name);
-    return (
-      sameFamily.find((f) => !!f.bold === bold && !!f.italic === italic) ??
-      sameFamily.find((f) => !!f.bold === bold) ??
-      sameFamily.find((f) => !f.bold && !f.italic) ??
-      sameFamily[0]
-    );
+  /**
+   * Line metrics of the primary font (the first candidate of the family), in
+   * points: `full` is ascent + descent, `ascent` the part above the baseline.
+   * Registered fonts are measured from their hhea metrics: pdf-lib's
+   * `heightAtSize(size, { descender: false })` is wrong for embedded fonts
+   * and placed text too high, so it was clipped at the top of its box.
+   */
+  async metrics(v: FontVariant, size: number): Promise<{ full: number; ascent: number }> {
+    const set = await this.fontSet();
+    const choice = set.candidates(v)[0] ?? null;
+    if (choice) {
+      const { ascent, descent, unitsPerEm } = choice.font;
+      return { full: ((ascent - descent) / unitsPerEm) * size, ascent: (ascent / unitsPerEm) * size };
+    }
+    const font = await this.embed(null, v);
+    return { full: font.heightAtSize(size), ascent: font.heightAtSize(size, { descender: false }) };
   }
 
-  private async resolve(family: string, bold: boolean, italic: boolean): Promise<ResolvedFont> {
-    const custom = this.findCustom(family, bold, italic);
-    if (custom) {
-      if (!this.fontkitRegistered) {
-        type Fontkit = Parameters<PDFDocument['registerFontkit']>[0];
-        const mod = (await import('@pdf-lib/fontkit')) as unknown as { default?: Fontkit } & Fontkit;
-        this.pdf.registerFontkit(mod.default ?? mod);
-        this.fontkitRegistered = true;
-      }
-      const bytes = custom.data instanceof Uint8Array ? custom.data : new Uint8Array(custom.data);
-      return { font: await this.pdf.embedFont(bytes, { subset: true }), standard: false };
-    }
-    return { font: await this.pdf.embedFont(standardFontName(family, bold, italic)), standard: true };
+  /** Assigns a font to every code point of `text`, recording characters no font has. */
+  async assign(text: string, v: FontVariant): Promise<FontChoice[]> {
+    return (await this.fontSet()).assign(text, v, (cp) => this.missing.add(cp));
+  }
+
+  /** A warning listing characters no font could draw, if any. */
+  missingWarning(): string | null {
+    if (this.missing.size === 0) return null;
+    const list = [...this.missing]
+      .slice(0, 10)
+      .map((cp) => `"${String.fromCodePoint(cp)}" (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`)
+      .join(', ');
+    const more = this.missing.size > 10 ? ` and ${this.missing.size - 10} more` : '';
+    return `No font can draw ${list}${more}. Register a font that covers these characters (pdf.fonts).`;
   }
 }
 
-/** Replaces characters the standard fonts cannot encode. */
+/** Replaces characters the standard fonts cannot encode. Invisible format characters are dropped. */
 export function sanitizeForStandardFont(text: string): string {
   let out = '';
   for (const ch of text.replace(/\t/g, '    ')) {
-    out += Encodings.WinAnsi.canEncodeUnicodeCodePoint(ch.codePointAt(0)!) ? ch : '?';
+    if (Encodings.WinAnsi.canEncodeUnicodeCodePoint(ch.codePointAt(0)!)) out += ch;
+    else if (!FORMAT_CHAR.test(ch)) out += '?';
   }
   return out;
+}
+
+const FORMAT_CHAR = /\p{Cf}/u;
+const WHITESPACE = /\s/u;
+
+/** One input run of a line: plain text has a single run. */
+interface LineRun {
+  text: string;
+  bold: boolean;
+  italic: boolean;
+  run?: LayoutTextRun;
+}
+
+/** A piece of a line, ready to draw, in visual (left-to-right) order. */
+interface Piece {
+  /** The string handed to pdf-lib; fontkit may reverse it again while shaping. */
+  text: string;
+  font: PDFFont;
+  width: number;
+  run?: LayoutTextRun;
+  space: boolean;
+}
+
+/**
+ * Lays out one line: assigns fonts per character, resolves bidi levels on
+ * the whole line, and returns the pieces in visual order. With
+ * `splitSpaces`, whitespace becomes separate pieces (for justification).
+ */
+async function linePieces(fonts: FontManager, runs: LineRun[], family: string, base: BaseDirection, size: number, splitSpaces: boolean): Promise<Piece[]> {
+  // `script` keeps characters of left-to-right and right-to-left scripts in
+  // separate pieces, so fontkit's own reversal is predictable per piece.
+  type Seg = { chars: string[]; level: number; runIndex: number; choice: FontChoice; space: boolean; script: BaseDirection | null };
+  const all = runs.map((r) => r.text).join('');
+  const levels = bidiLevels(all, base);
+  const segs: Seg[] = [];
+  let index = 0;
+  for (let r = 0; r < runs.length; r++) {
+    const run = runs[r]!;
+    const choices = await fonts.assign(run.text, { family, bold: run.bold, italic: run.italic });
+    let k = 0;
+    for (const ch of run.text) {
+      const choice = choices[k++] ?? null;
+      const level = levels[index++]!;
+      if (isBidiControl(ch.codePointAt(0)!)) continue;
+      const space = splitSpaces && WHITESPACE.test(ch);
+      const script = scriptDirection(ch);
+      const last = segs[segs.length - 1];
+      if (
+        last &&
+        last.runIndex === r &&
+        last.choice === choice &&
+        last.level === level &&
+        last.space === space &&
+        (script === null || last.script === null || last.script === script)
+      ) {
+        last.chars.push(ch);
+        last.script ??= script;
+      } else {
+        segs.push({ chars: [ch], level, runIndex: r, choice, space, script });
+      }
+    }
+  }
+  const pieces: Piece[] = [];
+  for (const seg of reorderSegments(segs)) {
+    const run = runs[seg.runIndex]!;
+    const rtl = seg.level % 2 === 1;
+    const visual = (rtl ? seg.chars.map(mirrorChar).reverse() : seg.chars).join('');
+    let text: string;
+    if (seg.choice === null) {
+      text = sanitizeForStandardFont(visual);
+    } else {
+      // fontkit reverses strings in right-to-left scripts after shaping. Hand it
+      // the string that comes out in visual order (logical order for Arabic letters).
+      const reversed = Array.from(visual).reverse().join('');
+      text = shapesRightToLeft(visual) ? reversed : visual;
+    }
+    const font = await fonts.embed(seg.choice, { family, bold: run.bold, italic: run.italic });
+    const piece: Piece = { text, font, width: font.widthOfTextAtSize(text, size), space: seg.space };
+    if (run.run) piece.run = run.run;
+    pieces.push(piece);
+  }
+  return pieces;
 }
 
 function dashArray(style: ResolvedBorder['style'], width: number): number[] | undefined {
@@ -142,6 +252,9 @@ class PdfRenderer {
       this.page = this.pdf.addPage([this.doc.pageWidth, this.doc.pageHeight]);
       for (const band of page.bands) await this.band(band);
     }
+    const missing = this.fonts.missingWarning();
+    // Missing glyphs turn text into "?", so they are reported even without a handler.
+    if (missing) (this.options.onWarning ?? ((m: string) => console.warn(`[ariana-reports] ${m}`)))(missing);
   }
 
   private async band(band: LayoutBand): Promise<void> {
@@ -253,55 +366,16 @@ class PdfRenderer {
   private async text(item: LayoutText): Promise<void> {
     const { style } = item;
     this.box(item.x, item.y, item.width, item.height, style.backgroundColor, style.border);
-    if (item.runs) return this.richText(item, item.runs);
-    const fill = this.color(style.color);
-    if (!fill || item.lines.every((l) => l === '')) return;
-
-    const { font, standard } = await this.fonts.get(style);
-    const size = style.fontSize;
-    const lh = item.lineHeight;
-    const pad = style.padding;
-    const contentX = item.x + pad.left;
-    const contentWidth = Math.max(0, item.width - pad.left - pad.right);
-    const contentTop = item.y + pad.top;
-    const available = item.height - pad.top - pad.bottom;
-    const textHeight = item.lines.length * lh;
-    const offset =
-      style.verticalAlign === 'middle' ? (available - textHeight) / 2 : style.verticalAlign === 'bottom' ? available - textHeight : 0;
-    // Center the font's ascent+descent box inside the line box, as CSS does.
-    const full = font.heightAtSize(size);
-    const ascent = font.heightAtSize(size, { descender: false });
-
-    this.clip(item.x, item.y, item.width, item.height);
-    try {
-      item.lines.forEach((rawLine, i) => {
-        const line = standard ? sanitizeForStandardFont(rawLine) : rawLine;
-        if (line === '') return;
-        const baseline = contentTop + offset + i * lh + (lh - full) / 2 + ascent;
-        const y = this.flipY(baseline);
-        const lineWidth = font.widthOfTextAtSize(line, size);
-        const isLast = i === item.lines.length - 1;
-
-        if (style.textAlign === 'justify' && !isLast && /\S\s+\S/.test(line)) {
-          this.justified(line, contentX, y, contentWidth, font, size, fill);
-          this.decoration(style, contentX, baseline, contentWidth, fill);
-        } else {
-          let x = contentX;
-          if (style.textAlign === 'center') x += (contentWidth - lineWidth) / 2;
-          else if (style.textAlign === 'right') x += contentWidth - lineWidth;
-          this.page.drawText(line, { x, y, size, font, color: fill.color, opacity: fill.opacity });
-          this.decoration(style, x, baseline, lineWidth, fill);
-        }
-      });
-    } finally {
-      this.unclip();
-    }
-  }
-
-  /** Draws text with per-run fonts, colors and decorations (components with `allowHtml`). */
-  private async richText(item: LayoutText, lines: LayoutTextRun[][]): Promise<void> {
-    const { style } = item;
+    const bold = style.fontWeight === 'bold';
+    const italic = style.fontStyle === 'italic';
+    // Plain text is one run per line; `allowHtml` text has styled runs.
+    const plainFill = item.runs ? null : this.color(style.color);
+    if (!item.runs && !plainFill) return;
+    const lines: LineRun[][] = item.runs
+      ? item.runs.map((runs) => runs.map((r) => ({ text: r.text, bold: r.bold, italic: r.italic, run: r })))
+      : item.lines.map((line) => [{ text: line, bold, italic }]);
     if (lines.every((runs) => runs.every((r) => r.text === ''))) return;
+
     const size = style.fontSize;
     const lh = item.lineHeight;
     const pad = style.padding;
@@ -312,94 +386,72 @@ class PdfRenderer {
     const textHeight = lines.length * lh;
     const offset =
       style.verticalAlign === 'middle' ? (available - textHeight) / 2 : style.verticalAlign === 'bottom' ? available - textHeight : 0;
+    const base = item.direction ?? resolveBaseDirection(item.text, style.direction);
+    // Center the primary font's ascent+descent box inside the line box, as CSS does.
+    const { full, ascent } = await this.fonts.metrics({ family: style.fontFamily, bold, italic }, size);
 
-    // Resolve fonts up front; drawing below is synchronous.
-    type Piece = { text: string; font: PDFFont; width: number; run: LayoutTextRun };
-    const prepared: Piece[][] = [];
-    for (const runs of lines) {
-      const pieces: Piece[] = [];
-      for (const run of runs) {
-        const { font, standard } = await this.fonts.get({ ...style, fontWeight: run.bold ? 'bold' : 'normal', fontStyle: run.italic ? 'italic' : 'normal' });
-        const text = standard ? sanitizeForStandardFont(run.text) : run.text;
-        pieces.push({ text, font, width: font.widthOfTextAtSize(text, size), run });
-      }
-      prepared.push(pieces);
+    // Lay out every line first; drawing below is synchronous.
+    const prepared: { pieces: Piece[]; justify: boolean }[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const runs = lines[i]!;
+      const lineText = runs.map((r) => r.text).join('');
+      const justify = style.textAlign === 'justify' && i < lines.length - 1 && /\S\s+\S/.test(lineText);
+      prepared.push({ pieces: await linePieces(this.fonts, runs, style.fontFamily, base, size, justify), justify });
     }
-    const metricsFont = prepared.flat()[0]?.font;
-    if (!metricsFont) return;
-    const full = metricsFont.heightAtSize(size);
-    const ascent = metricsFont.heightAtSize(size, { descender: false });
 
-    const drawPiece = (p: Piece, x: number, lineTop: number, baseline: number, width = p.width) => {
-      const bg = this.color(p.run.backgroundColor);
-      if (bg && width > 0) {
-        this.page.drawRectangle({ x, y: this.flipY(lineTop + lh), width, height: lh, color: bg.color, opacity: bg.opacity });
+    const drawPiece = (p: Piece, x: number, lineTop: number, baseline: number, width: number) => {
+      const run = p.run;
+      if (run) {
+        const bg = this.color(run.backgroundColor);
+        if (bg && width > 0) {
+          this.page.drawRectangle({ x, y: this.flipY(lineTop + lh), width, height: lh, color: bg.color, opacity: bg.opacity });
+        }
       }
-      const fill = this.color(p.run.color);
+      const fill = run ? this.color(run.color) : plainFill;
       if (!fill || p.text === '') return;
       if (p.text.trim() !== '') this.page.drawText(p.text, { x, y: this.flipY(baseline), size, font: p.font, color: fill.color, opacity: fill.opacity });
-      if (p.run.underline) this.decoration({ ...style, textDecoration: 'underline' }, x, baseline, width, fill);
-      if (p.run.strike) this.decoration({ ...style, textDecoration: 'line-through' }, x, baseline, width, fill);
+      if (run?.underline) this.decoration({ ...style, textDecoration: 'underline' }, x, baseline, width, fill);
+      if (run?.strike) this.decoration({ ...style, textDecoration: 'line-through' }, x, baseline, width, fill);
     };
 
     this.clip(item.x, item.y, item.width, item.height);
     try {
-      prepared.forEach((pieces, i) => {
+      prepared.forEach(({ pieces, justify }, i) => {
+        if (pieces.length === 0) return;
         const lineTop = contentTop + offset + i * lh;
         const baseline = lineTop + (lh - full) / 2 + ascent;
-        const lineText = pieces.map((p) => p.text).join('');
-        const isLast = i === prepared.length - 1;
-        if (style.textAlign === 'justify' && !isLast && /\S\s+\S/.test(lineText)) {
-          // Split into words and spaces; inner spaces share the free width.
-          const tokens: Piece[] = [];
-          for (const p of pieces) {
-            for (const part of p.text.split(/(\s+)/)) {
-              if (part !== '') tokens.push({ ...p, text: part, width: p.font.widthOfTextAtSize(part, size) });
-            }
-          }
-          while (tokens.length && tokens[0]!.text.trim() === '') tokens.shift();
-          while (tokens.length && tokens[tokens.length - 1]!.text.trim() === '') tokens.pop();
-          const words = tokens.filter((t) => t.text.trim() !== '');
-          const gaps = tokens.length - words.length;
-          const gap = gaps > 0 ? (contentWidth - words.reduce((s, t) => s + t.width, 0)) / gaps : 0;
+        if (justify) {
+          // Inner spaces share the free width; spaces at either end are dropped.
+          const tokens = pieces.slice();
+          while (tokens.length && tokens[0]!.space) tokens.shift();
+          while (tokens.length && tokens[tokens.length - 1]!.space) tokens.pop();
+          const gaps = tokens.filter((t) => t.space).length;
+          const wordsWidth = tokens.reduce((s, t) => s + (t.space ? 0 : t.width), 0);
+          const gap = gaps > 0 ? (contentWidth - wordsWidth) / gaps : 0;
           let cursor = contentX;
           for (const t of tokens) {
-            const w = t.text.trim() === '' ? gap : t.width;
+            const w = t.space ? gap : t.width;
             drawPiece(t, cursor, lineTop, baseline, w);
             cursor += w;
           }
+          if (plainFill) this.decoration(style, contentX, baseline, contentWidth, plainFill);
           return;
         }
         const total = pieces.reduce((s, p) => s + p.width, 0);
+        // The last line of justified text starts at the start edge.
+        const align = style.textAlign === 'justify' ? (base === 'rtl' ? 'right' : 'left') : style.textAlign;
         let x = contentX;
-        if (style.textAlign === 'center') x += (contentWidth - total) / 2;
-        else if (style.textAlign === 'right') x += contentWidth - total;
+        if (align === 'center') x += (contentWidth - total) / 2;
+        else if (align === 'right') x += contentWidth - total;
+        const start = x;
         for (const p of pieces) {
-          drawPiece(p, x, lineTop, baseline);
+          drawPiece(p, x, lineTop, baseline, p.width);
           x += p.width;
         }
+        if (plainFill) this.decoration(style, start, baseline, total, plainFill);
       });
     } finally {
       this.unclip();
-    }
-  }
-
-  private justified(
-    line: string,
-    x: number,
-    y: number,
-    width: number,
-    font: PDFFont,
-    size: number,
-    fill: { color: ReturnType<PdfLib['rgb']>; opacity: number },
-  ): void {
-    const words = line.trim().split(/\s+/);
-    const wordsWidth = words.reduce((sum, w) => sum + font.widthOfTextAtSize(w, size), 0);
-    const gap = (width - wordsWidth) / (words.length - 1);
-    let cursor = x;
-    for (const word of words) {
-      this.page.drawText(word, { x: cursor, y, size, font, color: fill.color, opacity: fill.opacity });
-      cursor += font.widthOfTextAtSize(word, size) + gap;
     }
   }
 

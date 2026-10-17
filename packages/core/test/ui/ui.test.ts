@@ -62,6 +62,21 @@ describe('design helpers', () => {
     expect(parseFloat(p.style.width!)).toBeCloseTo(190 * designScale('mm'), 2);
   });
 
+  it('previews the text direction', () => {
+    const t = invoiceTemplate();
+    const base = { id: 'x', type: 'text', x: 0, y: 0, width: 50, height: 10, text: 'سلام' } as ReportComponent;
+    // auto: the browser decides from the text (dir="auto") and aligns to the start edge.
+    const auto = componentPreview(base, t);
+    expect(auto.dir).toBe('auto');
+    expect(auto.style.textAlign).toBe('start');
+    const rtl = componentPreview({ ...base, style: { direction: 'rtl' } } as ReportComponent, t);
+    expect(rtl.dir).toBe('rtl');
+    expect(rtl.style.textAlign).toBe('right');
+    const aligned = componentPreview({ ...base, style: { direction: 'auto', textAlign: 'center' } } as ReportComponent, t);
+    expect(aligned.style.textAlign).toBe('center');
+    expect(componentPreview({ id: 'r', type: 'rectangle', x: 0, y: 0, width: 5, height: 5 } as ReportComponent, t).dir).toBeUndefined();
+  });
+
   it('reports text syntax errors', () => {
     const t = invoiceTemplate();
     const c = { id: 'x', type: 'text', x: 0, y: 0, width: 10, height: 5, text: '{{ row.total +' } as ReportComponent;

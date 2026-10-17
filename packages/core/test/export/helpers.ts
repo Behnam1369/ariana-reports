@@ -50,6 +50,10 @@ export function dataUri(bytes: Uint8Array, mime: string): string {
 export const latoBytes = (): Uint8Array =>
   new Uint8Array(readFileSync(new URL('../fixtures/fonts/Lato-Regular.ttf', import.meta.url)));
 
+/** Vazirmatn (SIL OFL 1.1): Persian and Arabic letters plus Latin. */
+export const vazirmatnBytes = (): Uint8Array =>
+  new Uint8Array(readFileSync(new URL('../fixtures/fonts/Vazirmatn-Regular.ttf', import.meta.url)));
+
 /** Decoded content stream operators of a page, as text. */
 export function pageContent(page: PDFPage): string {
   const contents = page.node.Contents();

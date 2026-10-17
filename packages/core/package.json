@@ -1,6 +1,6 @@
 {
   "name": "@ariana-reports/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Framework-agnostic banded reporting engine: JSON templates, JSON data, safe JavaScript expressions, PDF and Excel export.",
   "license": "MIT",
   "author": "Behnam Aghaali",

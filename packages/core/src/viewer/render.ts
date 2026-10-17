@@ -1,5 +1,6 @@
 import { parseColor } from '../export/color';
 import { standardFamily } from '../layout/text';
+import { resolveBaseDirection } from '../layout/bidi';
 import { formatLabel } from '../ui/labels';
 import type {
   LayoutBand,
@@ -196,6 +197,9 @@ class DomRenderer {
     // With styled runs each span carries its own decoration (CSS decorations cannot be undone by children).
     if (style.textDecoration !== 'none' && !item.runs) el.style.textDecoration = style.textDecoration;
     if (item.error) el.title = 'Expression error';
+    // The browser applies the bidi algorithm to each line on the same base direction as the PDF.
+    const dir = item.direction ?? resolveBaseDirection(item.text, style.direction);
+    el.dir = dir;
 
     // Lines are pre-wrapped by the engine; render one block per line so breaks match the PDF.
     item.lines.forEach((line, i) => {
@@ -205,7 +209,7 @@ class DomRenderer {
       lineEl.style.flex = 'none';
       lineEl.style.minHeight = pt(item.lineHeight, this.s);
       const isLast = i === item.lines.length - 1;
-      lineEl.style.textAlign = style.textAlign === 'justify' ? (isLast ? 'left' : 'justify') : style.textAlign;
+      lineEl.style.textAlign = style.textAlign === 'justify' ? (isLast ? (dir === 'rtl' ? 'right' : 'left') : 'justify') : style.textAlign;
       if (style.textAlign === 'justify' && !isLast) {
         lineEl.style.textAlignLast = 'justify';
         lineEl.style.whiteSpace = 'pre-wrap';

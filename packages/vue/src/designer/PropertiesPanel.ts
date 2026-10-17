@@ -15,6 +15,7 @@ import {
   TEXT_ALIGNS,
   TEXT_DECORATIONS,
   UNITS,
+  TEXT_DIRECTIONS,
   VERTICAL_ALIGNS,
   type Band,
   type BorderSpec,
@@ -103,6 +104,9 @@ function styleEditor(style: StyleProps, onChange: (patch: Patch) => void, textPr
       field(l.align, (id) => h(SelectInput, { id, value: style.textAlign, options: TEXT_ALIGNS, translate: true, allowEmpty: l.defaultOption, onChange: (textAlign?: string) => onChange({ textAlign }) })),
       field(l.verticalAlign, (id) =>
         h(SelectInput, { id, value: style.verticalAlign, options: VERTICAL_ALIGNS, translate: true, allowEmpty: l.defaultOption, onChange: (verticalAlign?: string) => onChange({ verticalAlign }) }),
+      ),
+      field(l.textDirection, (id) =>
+        h(SelectInput, { id, value: style.direction, options: TEXT_DIRECTIONS, translate: true, allowEmpty: l.defaultOption, onChange: (direction?: string) => onChange({ direction }) }),
       ),
       field(l.padding, (id) =>
         h(NumberInput, { id, optional: true, min: 0, value: typeof style.padding === 'number' ? style.padding : undefined, onCommit: (padding?: number) => onChange({ padding }) }),

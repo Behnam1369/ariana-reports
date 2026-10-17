@@ -1,4 +1,4 @@
-import type { ReportComponent, ReportTemplate, Unit } from '../model/types';
+import type { ReportComponent, ReportTemplate, TextDirection, Unit } from '../model/types';
 import { toPoints } from '../model/units';
 import { mergeStyles, resolveStyle } from '../layout/style';
 import { LINE_HEIGHT_FACTOR } from '../layout/text';
@@ -25,6 +25,8 @@ export interface ComponentPreview {
    * (render each as a text span with its camelCase CSS `style`). Null otherwise.
    */
   runs: { text: string; style: Record<string, string> }[] | null;
+  /** For text components: the value for the element's `dir` attribute. Undefined otherwise. */
+  dir?: TextDirection;
 }
 
 /**
@@ -35,7 +37,9 @@ export function componentPreview(c: ReportComponent, template: ReportTemplate, z
   const s = designScale(template.unit, zoom);
   const px = (v: number) => `${Number((v * s).toFixed(3))}px`;
   const ptPx = (v: number) => `${Number((v * PX_PER_PT * zoom).toFixed(3))}px`;
-  const resolved = resolveStyle(mergeStyles(c.styleName ? template.styles?.[c.styleName] : undefined, c.style), template.unit);
+  const merged = mergeStyles(c.styleName ? template.styles?.[c.styleName] : undefined, c.style);
+  const resolved = resolveStyle(merged, template.unit);
+  let dir: TextDirection | undefined;
   const style: Record<string, string> = {
     left: px(c.x),
     top: px(c.y),
@@ -74,7 +78,8 @@ export function componentPreview(c: ReportComponent, template: ReportTemplate, z
         fontWeight: resolved.fontWeight,
         fontStyle: resolved.fontStyle,
         color: cssColor(resolved.color) ?? 'transparent',
-        textAlign: resolved.textAlign,
+        // With `auto` and no alignment the browser aligns to the start edge it detects, like the report.
+        textAlign: merged.textAlign === undefined && resolved.direction === 'auto' ? 'start' : resolved.textAlign,
         padding: `${ptPx(p.top)} ${ptPx(p.right)} ${ptPx(p.bottom)} ${ptPx(p.left)}`,
         display: 'flex',
         flexDirection: 'column',
@@ -82,6 +87,7 @@ export function componentPreview(c: ReportComponent, template: ReportTemplate, z
       });
       if (resolved.textDecoration !== 'none' && !c.allowHtml) style.textDecoration = resolved.textDecoration;
       if (c.wordWrap === false) style.whiteSpace = 'pre';
+      dir = resolved.direction;
       if (c.allowHtml) {
         const base = {
           bold: resolved.fontWeight === 'bold',
@@ -132,7 +138,9 @@ export function componentPreview(c: ReportComponent, template: ReportTemplate, z
       break;
     }
   }
-  return { style, label, error, runs };
+  const out: ComponentPreview = { style, label, error, runs };
+  if (dir) out.dir = dir;
+  return out;
 }
 
 /** Ready-made expressions offered by the designer's text editor (inserted inside `{{ }}`). */
